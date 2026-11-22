@@ -9,10 +9,12 @@ import { fileURLToPath } from 'node:url';
 
 import { findBacklog, loadBacklog, SPEC_VERSION } from 'open-backlog';
 
+import { ApiError, createApi, createEvents, readBody, route } from './api.js';
+
 /**
  * The board's server (2.4.1, D4): an HTTP server on this computer only (127.0.0.1) that serves
- * the built Angular app and a JSON API over open-backlog. Every rule (reading, IDs, validation,
- * git) is open-backlog's (D1); this file only answers requests. The API grows in 2.4.2.
+ * the built Angular app and a JSON API over open-backlog (server/api.ts, 2.4.2). Every rule
+ * (reading, IDs, validation, git) is open-backlog's (D1); this file only answers requests.
  */
 
 /** The only address the board listens on: this computer. */
@@ -27,6 +29,8 @@ export interface BoardOptions {
   port?: number;
   /** The built app (dist/app), served as files; by default the one in this package. */
   appDir?: string;
+  /** Commit each change (default true); false leaves committing to you (ob serve --no-commit). */
+  commit?: boolean;
 }
 
 export interface Board {
@@ -68,6 +72,8 @@ export async function startBoard(opts: BoardOptions = {}): Promise<Board> {
   loadBacklog(backlogDir); // fail now, not on the first request, if it can't be read
   const appDir = resolve(opts.appDir ?? APP_DIR);
   let port = opts.port ?? DEFAULT_PORT;
+  const api = createApi({ backlogDir, commit: opts.commit !== false });
+  const events = createEvents(backlogDir);
 
   const server = createServer((req, res) => {
     handle(req, res).catch(e => send(res, 500, 'application/json', JSON.stringify({ error: (e as Error).message })));
@@ -77,19 +83,42 @@ export async function startBoard(opts: BoardOptions = {}): Promise<Board> {
     // Only a page loaded from this board may talk to it: a site that points its own name at
     // 127.0.0.1 (DNS rebinding) sends its own Host, and is refused.
     if (!allowedHost(req.headers.host, port)) return send(res, 421, 'text/plain; charset=utf-8', 'This board answers only at 127.0.0.1 or localhost.\n');
-    if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'text/plain; charset=utf-8', 'Not allowed.\n');
-    const path = decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname);
+    const path = new URL(req.url ?? '/', 'http://x').pathname;
+    const method = req.method ?? 'GET';
+    const reading = method === 'GET' || method === 'HEAD';
+    const sendJson = (status: number, body: unknown) => send(res, status, 'application/json', JSON.stringify(body));
 
-    if (path === '/api/health') {
-      const b = loadBacklog(backlogDir);
-      const health: Health = { board: ownVersion, core: coreVersion, spec: SPEC_VERSION, backlog: { name: String(b.config['name'] ?? ''), items: b.items.length } };
-      return send(res, 200, 'application/json', JSON.stringify(health));
+    // The body is read once, here, at most 1 MB, so every check and route sees the same one.
+    let raw: Buffer = Buffer.alloc(0);
+    if (!reading) {
+      try {
+        raw = await readBody(req);
+      } catch (e) {
+        if (e instanceof ApiError) return sendJson(e.status, { error: e.message });
+        throw e;
+      }
     }
-    if (path.startsWith('/api/')) return send(res, 404, 'application/json', JSON.stringify({ error: `no API ${path}` }));
+    if (path.startsWith('/api/')) {
+      // A change must come from the board's own page, as JSON: a page on another site can't
+      // set that Origin, and a plain HTML form can't send JSON.
+      if (!reading) {
+        if (!allowedOrigin(req.headers.origin, port)) return sendJson(403, { error: 'changes are accepted only from the board itself' });
+        if (!/^application\/json\b/.test(req.headers['content-type'] ?? '')) return sendJson(415, { error: 'send JSON (Content-Type: application/json)' });
+      }
+      if (path === '/api/health' && reading) {
+        const b = loadBacklog(backlogDir);
+        const health: Health = { board: ownVersion, core: coreVersion, spec: SPEC_VERSION, backlog: { name: String(b.config['name'] ?? ''), items: b.items.length } };
+        return sendJson(200, health);
+      }
+      if (path === '/api/events' && method === 'GET') return events.open(res);
+      if (await route(api, req, path, raw, sendJson)) return;
+      return sendJson(404, { error: `no API ${path}` });
+    }
+    if (!reading) return send(res, 405, 'text/plain; charset=utf-8', 'Not allowed.\n');
 
     // The app's files; a path that isn't one (an item's page, such as /item/2.3.4) is the app's own
     // page, unless it asks for a kind of file the app has (a missing .js is a 404).
-    const file = resolve(appDir, `.${path}`);
+    const file = resolve(appDir, `.${decodeURIComponent(path)}`);
     if (file !== appDir && !file.startsWith(appDir + sep)) return send(res, 404, 'text/plain; charset=utf-8', 'Not found.\n');
     const found = await isFile(file) ? file : TYPES[extname(path)] ? null : join(appDir, 'index.html');
     if (!found || !await isFile(found)) return send(res, 404, 'text/plain; charset=utf-8', 'Not found.\n');
@@ -105,8 +134,13 @@ export async function startBoard(opts: BoardOptions = {}): Promise<Board> {
     url: `http://${HOST}:${port}/`,
     port,
     backlogDir,
-    close: () => new Promise<void>(ok => { server.closeAllConnections(); server.close(() => ok()); }),
+    close: () => new Promise<void>(ok => { events.close(); server.closeAllConnections(); server.close(() => ok()); }),
   };
+}
+
+/** A page served by this board: http://127.0.0.1:<port> or http://localhost:<port>. */
+export function allowedOrigin(origin: string | undefined, port: number): boolean {
+  return origin === `http://127.0.0.1:${port}` || origin === `http://localhost:${port}`;
 }
 
 /** 127.0.0.1 or localhost, on this port (or none given). */

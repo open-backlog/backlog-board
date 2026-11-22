@@ -48,6 +48,11 @@ try {
   const core = JSON.parse(readFileSync(join(tmp, 'lib', 'node_modules', pkg.name, 'node_modules', 'open-backlog', 'package.json'), 'utf8')).version;
   if (health.board !== pkg.version || health.core !== core || health.backlog?.name !== 'shop' || !(health.backlog?.items > 0)) fail(`/api/health gave ${JSON.stringify(health)}`);
   else console.log(`smoke: /api/health reads the backlog through open-backlog ${core} (${health.backlog.name}, ${health.backlog.items} items)`);
+
+  const tree = await (await fetch(url + 'api/tree')).json();
+  const refused = await fetch(url + 'api/items/1.2.1/move', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"status":"doing"}' });
+  if (!Array.isArray(tree) || !tree.length || refused.status !== 403) fail(`/api/tree gave ${JSON.stringify(tree).slice(0, 80)}; a change without the board's Origin got ${refused.status}`);
+  else console.log(`smoke: /api/tree gives the plan (${tree.length} top items), and a change without the board's Origin is refused`);
 } catch (e) {
   fail(e.message);
 } finally {

@@ -1,11 +1,11 @@
-import { Component, signal } from '@angular/core';
+import { Component, DestroyRef, inject, signal } from '@angular/core';
 
 import { loadHealth } from './health';
 import type { Health } from './health';
 
 /**
  * The board's shell (2.4.1): the header, and which backlog it serves, from the server's
- * /api/health. The columns (2.4.3), item editor (2.4.4), tree (2.4.5) and Sync (2.4.6) come next.
+ * /api/health, read again whenever /api/events says the backlog changed (2.4.2). The columns (2.4.3), item editor (2.4.4), tree (2.4.5) and Sync (2.4.6) come next.
  */
 @Component({
   selector: 'ob-root',
@@ -42,6 +42,14 @@ export class App {
   readonly error = signal<string | null>(null);
 
   constructor() {
-    loadHealth().then(h => this.health.set(h), (e: unknown) => this.error.set((e as Error).message));
+    this.refresh();
+    // The server says when anything in the backlog changes, from the board or an editor (2.4.2).
+    const events = new EventSource('api/events');
+    events.addEventListener('change', () => this.refresh());
+    inject(DestroyRef).onDestroy(() => events.close());
+  }
+
+  refresh(): void {
+    loadHealth().then(h => { this.health.set(h); this.error.set(null); }, (e: unknown) => this.error.set((e as Error).message));
   }
 }

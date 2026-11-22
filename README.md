@@ -1,22 +1,45 @@
-# backlog-board
+# open-backlog-board
 
-The local board for [Open Backlog](https://openbacklog.org): a web board over a backlog of
-Markdown files in git, published to npm as **`open-backlog-board`**. `ob serve` starts it for
-the backlog you're in and opens your browser. You never build anything: the app ships built.
+The local board for [Open Backlog](https://openbacklog.org), where a backlog is Markdown files in
+your git repository: one file per story, in a `todo`, `doing` or `done` folder. The board shows
+those files as columns of cards you drag, a tree of the whole plan with its progress, and a Sync
+button that shares your changes through your own git. It runs on your computer only, and every
+change is a git commit you can read.
 
-**Status: the board, item editor, tree and Sync (2.4.6).** Columns of cards you drag to move or
-reorder, with filters; open a card to read and edit it, comment, or make a new item; the tree
-shows the whole plan's progress; Sync shares your changes. The npm package arrives in 2.4.7
-(`private` until then).
+![The board: todo, doing and done columns of cards, with filters](https://cdn.jsdelivr.net/npm/open-backlog-board@0.1.0/screenshots/board.png)
 
-## Try it
+## Start it
 
-From this checkout, on any repository with a `backlog/` (a scratch copy is safest: every drag is
-a real commit there):
+You need [Node.js](https://nodejs.org) 22 or later and git. In a repository that has a backlog
+(a `backlog/` folder with `config.yml`):
 
 ```sh
-npm install
-npm start -- --dir ~/path/to/repo     # builds, then http://127.0.0.1:4310/
+npx open-backlog-board
+```
+
+or for any folder, without changing to it:
+
+```sh
+npx open-backlog-board ~/path/to/repo
+```
+
+Then open the address it prints, normally **http://127.0.0.1:4310/** (if that port is taken, it
+uses the next free one). Stop it with Ctrl-C. To keep it installed:
+
+```sh
+npm install --global open-backlog-board
+open-backlog-board ~/path/to/repo
+```
+
+No backlog yet? `npx open-backlog init` makes one (see
+[open-backlog](https://www.npmjs.com/package/open-backlog), the `ob` command). Soon `ob serve`
+will start the board and open your browser in one step.
+
+Every drag and every save is a real commit in that repository, made with your git name, so try it
+on a copy first if you like. Nothing leaves your computer until you click **Sync**.
+
+```sh
+open-backlog-board [<folder>] [--port <n>]   # default: here, port 4310 (or the next free one)
 ```
 
 ## The board
@@ -35,6 +58,8 @@ npm start -- --dir ~/path/to/repo     # builds, then http://127.0.0.1:4310/
   message, and the cards go back to where they are on disk. Edits made in an editor appear at once.
 
 ## An item
+
+![An item open beside the board: where it sits, its fields, description and comments](https://cdn.jsdelivr.net/npm/open-backlog-board@0.1.0/screenshots/item.png)
 
 Click a card's title to open it beside the board:
 
@@ -60,6 +85,8 @@ into this month's unplanned work), and it opens when it's made.
 
 ## The tree
 
+![The tree: capabilities, epics and features, each with a progress bar](https://cdn.jsdelivr.net/npm/open-backlog-board@0.1.0/screenshots/tree.png)
+
 **Tree** (at the top, or `/#tree`) shows the plan: capabilities, epics and features, nested, each
 with a progress bar from its stories, bugs, spikes and tasks: done in green, doing beside it, and
 "1 of 2 done (50%)", the same numbers as `ob tree`. A feature with nothing in it yet is "0 of 0
@@ -67,6 +94,8 @@ done". The plan's total is at the top; epic 0's monthly features (the unplanned 
 it with theirs. Click a feature or an epic to open the board filtered to it.
 
 ## Sync
+
+![Sync, with the two commits it will send](https://cdn.jsdelivr.net/npm/open-backlog-board@0.1.0/screenshots/sync.png)
 
 Every change on the board is a commit in your repository, and none of it leaves your computer
 until you click **Sync** (top right). Beside it, "3 to share" counts your commits that aren't on
@@ -99,11 +128,9 @@ read again; **Check again** looks once you're done.
 - Every rule comes from [`open-backlog`](https://www.npmjs.com/package/open-backlog), the same
   core as the `ob` command: reading the files, IDs, validation and git. It's the board's only
   run-time dependency, and lint stops the server from importing a YAML or schema library or
-  running git itself, so the board and the CLI can't disagree.
-
-```sh
-open-backlog-board [--dir <folder>] [--port <n>]   # default: here, port 4310
-```
+  running git itself, so the board and the CLI can't disagree. The board depends on the same
+  minor version of `open-backlog` it was tested with (`^0.2.0`: any 0.2.x, never 0.3), since
+  while Open Backlog is 0.x a minor version is where its rules can change.
 
 ## The API
 
@@ -139,18 +166,19 @@ backlog folder, so an edit saved in a text editor reaches the board within a sec
 
 ## Develop
 
-Node 22 or later.
+From a checkout of this repository, with Node 22 or later:
 
 ```sh
 npm install
-npm run dev          # http://127.0.0.1:4300/ against test/fixtures/t3-application
-npm run check        # lint, build, test, smoke: what CI runs on every push
+npm start ~/path/to/repo   # build, then run it on that repository
+npm run dev                # http://127.0.0.1:4300/ against test/fixtures/t3-application
+npm run check              # lint, build, test, smoke: what CI runs on every push
 ```
 
 `npm run dev` runs the server on 127.0.0.1:4310 (restarted on every change) and the Angular dev
 server on 127.0.0.1:4300, which reloads the app and passes `/api` to the server (as the board's
 own origin, so changes made in development are accepted). To serve
-another backlog: `npm run dev -- --dir ../my-repo/backlog`.
+another backlog: `npm run dev ../my-repo`.
 
 | Path | |
 |---|---|
@@ -162,6 +190,15 @@ another backlog: `npm run dev -- --dir ../my-repo/backlog`.
 | `test/fixtures/` | two of backlog-spec's example backlogs, copied by `script/sync-fixtures.sh` |
 | `script/sync-art.sh` | copies backlog-art's tokens, fonts and icons into the app |
 | `script/smoke.mjs` | packs the package, checks its files, installs it globally into a temporary folder, starts it and fetches the app and the API |
+| `script/prepublish.mjs` | before any `npm publish`: refuses uncommitted changes and README images for another version |
+| `screenshots/` | the README's images, shipped in the package so the npm page can show them |
+
+### Releasing
+
+Change `"version"` in `package.json` (and the version in the README's image links: `npm run
+check` fails until they match), commit and push to `main`. The Publish workflow publishes that
+version to npm when it isn't there yet, after the full check, and tags the commit `v<version>`.
+A push that doesn't change the version publishes nothing.
 
 ## License
 

@@ -7,6 +7,8 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { readmeImages } from './readme-images.mjs';
+
 const root = new URL('..', import.meta.url).pathname;
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
 const tmp = mkdtempSync(join(tmpdir(), 'board-smoke-'));
@@ -15,10 +17,14 @@ let board;
 try {
   const [packed] = JSON.parse(execFileSync('npm', ['pack', '--dry-run', '--json', '--silent'], { cwd: root, encoding: 'utf8' }));
   const files = packed.files.map(f => f.path);
-  const extra = files.filter(f => !/^(package\.json|README\.md|LICENSE|dist\/server\/[a-z]+\.(js|d\.ts)|dist\/app\/.+)$/.test(f));
+  const extra = files.filter(f => !/^(package\.json|README\.md|LICENSE|dist\/server\/[a-z]+\.(js|d\.ts)|dist\/app\/.+|screenshots\/[a-z-]+\.png)$/.test(f));
   const missing = ['dist/server/main.js', 'dist/server/board.js', 'dist/app/index.html', 'dist/app/board-icon.png', 'LICENSE', 'README.md'].filter(f => !files.includes(f));
   if (extra.length || missing.length) fail(`the package has ${extra.join(', ') || 'nothing extra'} and lacks ${missing.join(', ') || 'nothing'}`);
-  else console.log(`smoke: the package is ${files.length} files: the built server and app, README, LICENSE, package.json`);
+  else console.log(`smoke: the package is ${files.length} files (${(packed.size / 1024).toFixed(0)} kB): the built server and app, the README's screenshots, README, LICENSE, package.json`);
+  const images = readmeImages(root, pkg.version);
+  const shipped = [...readFileSync(join(root, 'README.md'), 'utf8').matchAll(/screenshots\/[a-z-]+\.png/g)].map(m => m[0]).filter(f => !files.includes(f));
+  if (images.length || shipped.length) fail(`README images: ${[...images, ...shipped.map(f => `${f} is not in the package`)].join('; ')}`);
+  else console.log(`smoke: the README's images are ${pkg.version}'s screenshots, in the package`);
 
   const tgz = execFileSync('npm', ['pack', '--silent', '--pack-destination', tmp], { cwd: root, encoding: 'utf8' }).trim().split('\n').pop();
   execFileSync('npm', ['install', '--global', '--prefix', tmp, '--silent', join(tmp, tgz)], { stdio: 'inherit' });

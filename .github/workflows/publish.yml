@@ -1,0 +1,61 @@
+name: Publish
+
+# On every push to main: if package.json's version isn't on npm yet, npm publish as
+# open-backlog-board (its prepublishOnly runs script/prepublish.mjs and the full check first), then
+# a tag v<version> on that commit. A push that doesn't change the version publishes nothing. So a
+# release is: change "version" (and the README's image links), commit, push.
+# The very first version is published by hand (npm allows trusted publishing only for a package
+# that exists); this workflow then tags it on the next push. npm signs provenance only for
+# packages built in a public repository, so --provenance comes when backlog-board goes public
+# (3.2.3).
+on:
+  push:
+    branches: [main]
+
+permissions:
+  # To push the v<version> tag.
+  contents: write
+  # For npm trusted publishing (OIDC): no npm token is stored anywhere.
+  id-token: write
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          cache: npm
+      - name: Is this version new?
+        id: version
+        run: |
+          version=$(node -p "require('./package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          # The public registry, without auth: 200 published, 404 not yet, anything else stops.
+          status=$(curl -s -o /dev/null -w '%{http_code}' "https://registry.npmjs.org/open-backlog-board/$version")
+          case "$status" in
+            200) echo "open-backlog-board $version is already on npm: nothing to publish"; echo "new=false" >> "$GITHUB_OUTPUT" ;;
+            404) echo "open-backlog-board $version is new: checking, then publishing"; echo "new=true" >> "$GITHUB_OUTPUT" ;;
+            *) echo "::error::the npm registry answered $status for open-backlog-board $version"; exit 1 ;;
+          esac
+      - if: steps.version.outputs.new == 'true'
+        run: npm ci
+      - if: steps.version.outputs.new == 'true'
+        # prepublishOnly: script/prepublish.mjs, then npm run check (lint, build, test, smoke).
+        run: npm publish --access public
+      - name: Tag the release
+        # Also for a version published by hand (the first one): tag it if it isn't tagged yet.
+        run: |
+          tag="v${{ steps.version.outputs.version }}"
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
+            echo "$tag is already tagged"
+          else
+            git tag "$tag"
+            git push origin "$tag"
+          fi

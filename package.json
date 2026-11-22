@@ -1,8 +1,7 @@
 {
   "name": "open-backlog-board",
-  "version": "0.0.0",
-  "private": true,
-  "description": "Open Backlog's local board: a web board over a backlog of Markdown files in git, on this computer only. Started by ob serve.",
+  "version": "0.1.0",
+  "description": "Open Backlog's local board: drag cards, edit items, see the plan's progress and Sync, over a backlog of Markdown files in git, on your computer only.",
   "license": "MIT",
   "author": "Brandon Castagna",
   "homepage": "https://openbacklog.org",
@@ -29,6 +28,7 @@
   },
   "files": [
     "dist",
+    "screenshots",
     "LICENSE",
     "README.md"
   ],
@@ -43,7 +43,8 @@
     "smoke": "node script/smoke.mjs",
     "check": "npm run lint && npm run build && npm test && npm run smoke",
     "sync-art": "./script/sync-art.sh",
-    "sync-fixtures": "./script/sync-fixtures.sh"
+    "sync-fixtures": "./script/sync-fixtures.sh",
+    "prepublishOnly": "node script/prepublish.mjs && npm run check"
   },
   "dependencies": {
     "open-backlog": "^0.2.0"

@@ -2,13 +2,13 @@
 // The server (server/main.ts, restarted by tsx on every change) listens on 127.0.0.1:4310, and the
 // Angular dev server on 127.0.0.1:4300 reloads the app and passes /api to the server
 // (app/proxy.conf.json). Open http://127.0.0.1:4300/. Ctrl-C stops both.
-//   npm run dev -- --dir <folder>   to serve another backlog
+//   npm run dev <folder>   to serve another backlog (--dir <folder> works too)
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const at = process.argv.indexOf('--dir');
-const dir = at > 0 ? process.argv[at + 1] : 'test/fixtures/t3-application/backlog';
+const dir = (at > 0 ? process.argv[at + 1] : process.argv.slice(2).find(a => !a.startsWith('-'))) ?? 'test/fixtures/t3-application/backlog';
 const bin = name => fileURLToPath(new URL(`../node_modules/.bin/${name}`, import.meta.url));
 
 const children = [

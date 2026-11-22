@@ -6,7 +6,13 @@
   "license": "MIT",
   "author": "Brandon Castagna",
   "homepage": "https://openbacklog.org",
-  "keywords": ["backlog", "board", "kanban", "markdown", "git"],
+  "keywords": [
+    "backlog",
+    "board",
+    "kanban",
+    "markdown",
+    "git"
+  ],
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -27,6 +33,7 @@
     "README.md"
   ],
   "scripts": {
+    "start": "npm run build && node dist/server/main.js",
     "dev": "node script/dev.mjs",
     "build": "npm run build:server && npm run build:app",
     "build:server": "rm -rf dist/server && tsc -p tsconfig.server.json && chmod +x dist/server/main.js",
@@ -43,6 +50,7 @@
   },
   "devDependencies": {
     "@angular/build": "^22.2.7",
+    "@angular/cdk": "~22.2.0",
     "@angular/cli": "^22.2.7",
     "@angular/common": "^22.2.6",
     "@angular/compiler": "^22.2.6",

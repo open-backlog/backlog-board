@@ -4,8 +4,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { join } from 'node:path';
 
 import {
-  addComment, addItem, BacklogError, buildTree, changes, commit, isStoryLevel, listItems, loadBacklog, message, moveItem,
-  progressOf, recentlyDone, showItem, updateItem, validateDir,
+  addComment, addItem, BacklogError, buildOrder, buildTree, changes, columnOrder, commit, isStoryLevel, listItems, loadBacklog, message,
+  moveItem, progressOf, recentlyDone, reposOf, showItem, STORY_LEVEL_TYPES, updateItem, validateDir,
 } from 'open-backlog';
 import type { Backlog, FieldValue, Item, ListFilters, Node, Progress, Status } from 'open-backlog';
 
@@ -18,6 +18,7 @@ import type { Backlog, FieldValue, Item, ListFilters, Node, Progress, Status } f
  *
  *   GET    /api/items?status=&type=&parent=&repo=&assignee=&sprint=&all=1   as ob list --json
  *   GET    /api/items/:id                                                    as ob show --json
+ *   GET    /api/board?parent=&repo=&type=&all=1                              the columns, in column order
  *   GET    /api/tree?all=1                                                   as ob tree --json
  *   GET    /api/validate                                                     as ob validate --json
  *   GET    /api/events                                                       server-sent events
@@ -25,6 +26,7 @@ import type { Backlog, FieldValue, Item, ListFilters, Node, Progress, Status } f
  *   POST   /api/items/:id/move        { status }                             as ob move
  *   PATCH  /api/items/:id             { fields: { name: value | null } }     an edit, one commit
  *   POST   /api/items/:id/comments    { text, handle? }                      as ob comment
+ *   POST   /api/items/:id/rank        { after: id | null }                   reorder in its column (its rank only)
  */
 
 const STATUSES: readonly Status[] = ['todo', 'doing', 'done'];
@@ -63,6 +65,54 @@ export interface TreeOut {
   children: TreeOut[];
 }
 
+/** A card: what the board shows, from the item's fields. */
+export interface Card {
+  id: string;
+  type: string;
+  title: string;
+  status: Status;
+  repo: string[];
+  assignee: string | null;
+  rank: number | null;
+  parent: string | null;
+}
+
+export interface BoardOut {
+  columns: Record<Status, Card[]>;
+  /** Done items left out because they were finished more than 30 days ago (0 with all). */
+  hiddenDone: number;
+  /** What the filters can choose from. */
+  options: { epics: Choice[]; features: Choice[]; repos: string[]; types: string[] };
+}
+export interface Choice { id: string; title: string; parent: string | null }
+
+const card = (i: Item): Card => ({
+  id: i.id, type: i.type, title: i.title, status: i.status ?? 'todo', repo: reposOf(i),
+  assignee: typeof i.fields['assignee'] === 'string' ? i.fields['assignee'] : null,
+  rank: typeof i.fields['rank'] === 'number' ? i.fields['rank'] : null, parent: i.parent ?? null,
+});
+
+/**
+ * Where a card dropped after `after` (null: at the top) goes, by its own rank alone: between two
+ * ranked cards, halfway; after the last ranked one, one more; at the top, one less than the first
+ * (or 1). Cards with no rank come after ranked ones (spec, section 4), so a card can't go between
+ * two of them by changing only its own rank: it goes right after the ranked cards instead.
+ */
+export function rankFor(column: { id: string; rank: number | null }[], id: string, after: string | null): number {
+  const others = column.filter(c => c.id !== id);
+  const ranked = others.filter(c => c.rank !== null).map(c => c.rank as number);
+  const at = after === null ? 0 : others.findIndex(c => c.id === after) + 1;
+  if (after !== null && at === 0) throw new ApiError(400, `${after} is not in that column`);
+  const prev = others[at - 1];
+  const next = others[at];
+  const last = ranked.length ? Math.max(...ranked) : null;
+  if (prev && prev.rank === null) return last === null ? 1 : last + 1;
+  if (!prev) return next?.rank != null ? next.rank - 1 : 1;
+  const prevRank = prev.rank as number;
+  if (next?.rank != null) return (prevRank + next.rank) / 2;
+  return prevRank + 1;
+}
+
 const itemOut = (i: Item): ItemOut => ({ id: i.id, type: i.type, title: i.title, status: i.status ?? null, parent: i.parent ?? null, path: i.path, fields: i.fields });
 
 export function createApi(opts: ApiOptions) {
@@ -99,6 +149,40 @@ export function createApi(opts: ApiOptions) {
     const r = listItems(load(), filters, { all: q.get('all') === '1', days: DONE_DAYS });
     return { items: r.items.map(itemOut), hiddenDone: r.hiddenDone };
   };
+
+  /** The columns, filtered as ob list filters, each in column order (rank, then ID). */
+  const board = (q: URLSearchParams): BoardOut => {
+    const b = load();
+    const filters: ListFilters = {};
+    for (const key of ['parent', 'repo', 'type', 'assignee', 'sprint'] as const) {
+      const v = q.getAll(key).flatMap(s => s.split(',')).map(s => s.trim()).filter(Boolean);
+      if (v.length) filters[key] = v;
+    }
+    const r = listItems(b, filters, { all: q.get('all') === '1', days: DONE_DAYS });
+    const columns = Object.fromEntries(STATUSES.map(st => [st, columnOrder(r.items.filter(i => i.status === st)).map(card)])) as Record<Status, Card[]>;
+    const choice = (i: Item): Choice => ({ id: i.id, title: i.title, parent: i.parent ?? null });
+    const ordered = buildOrder(b.items);
+    const repos = b.config['repos'];
+    return {
+      columns, hiddenDone: r.hiddenDone,
+      options: {
+        epics: ordered.filter(i => i.type === 'epic').map(choice),
+        features: ordered.filter(i => i.type === 'feature').map(choice),
+        repos: repos && typeof repos === 'object' ? Object.keys(repos) : [],
+        types: [...STORY_LEVEL_TYPES],
+      },
+    };
+  };
+
+  /** Reorders a card in its column by changing its rank alone, as one edit (ob: edit <id> rank). */
+  const rank = (id: string, body: Record<string, unknown>) => serial(() => {
+    const after = body['after'] === null || body['after'] === undefined ? null : text(body, 'after');
+    const b = load();
+    const item = one(b, id);
+    if (!isStoryLevel(item)) throw new ApiError(400, `${id} is not on the board: only stories, bugs, spikes and tasks are`);
+    const column = columnOrder(b.items.filter(i => isStoryLevel(i) && i.status === item.status)).map(card);
+    return updateNow(id, { fields: { rank: rankFor(column, id, after) } });
+  });
 
   /** The tree as ob tree --json gives it, from the same core functions. */
   const tree = (q: URLSearchParams): TreeOut[] => {
@@ -147,7 +231,8 @@ export function createApi(opts: ApiOptions) {
    * Changes front-matter fields (null removes one). If the change gives the item a problem
    * ob validate reports, the file is put back and the problem is the answer.
    */
-  const update = (id: string, body: Record<string, unknown>) => serial(() => {
+  const update = (id: string, body: Record<string, unknown>) => serial(() => updateNow(id, body));
+  function updateNow(id: string, body: Record<string, unknown>) {
     const fields = body['fields'];
     if (!fields || typeof fields !== 'object' || Array.isArray(fields)) throw new ApiError(400, 'send { "fields": { "name": value } }; null removes a field');
     const b = load();
@@ -171,7 +256,7 @@ export function createApi(opts: ApiOptions) {
     }
     const committed = opts.commit ? commit([path], message.edit(id, Object.keys(changes_).join(', '))) : false;
     return { path: item.path, changed: true, committed };
-  });
+  }
 
   const comment = (id: string, body: Record<string, unknown>) => serial(() => {
     one(load(), id);
@@ -182,7 +267,7 @@ export function createApi(opts: ApiOptions) {
     });
   });
 
-  return { list, tree, validation, create, move, update, comment, show: (id: string) => { one(load(), id); return showItem(load(), id); } };
+  return { list, board, tree, validation, create, move, update, rank, comment, show: (id: string) => { one(load(), id); return showItem(load(), id); } };
 }
 
 export type Api = ReturnType<typeof createApi>;
@@ -199,19 +284,21 @@ const writeText = (p: string, t: string) => writeFileSync(p, t);
 
 /** Routes /api/… requests to the API; returns false for anything else. */
 export async function route(api: Api, req: IncomingMessage, path: string, raw: Buffer, send: (status: number, body: unknown) => void): Promise<boolean> {
-  const m = /^\/api\/items(?:\/([^/]+))?(?:\/(move|comments))?$/.exec(path);
+  const m = /^\/api\/items(?:\/([^/]+))?(?:\/(move|comments|rank))?$/.exec(path);
   const q = new URL(req.url ?? '/', 'http://x').searchParams;
   const method = req.method ?? 'GET';
   try {
-    if (path === '/api/tree' && method === 'GET') send(200, api.tree(q));
+    if (path === '/api/board' && method === 'GET') send(200, api.board(q));
+    else if (path === '/api/tree' && method === 'GET') send(200, api.tree(q));
     else if (path === '/api/validate' && method === 'GET') send(200, api.validation());
     else if (m && !m[1] && method === 'GET') send(200, api.list(q));
     else if (m && !m[1] && method === 'POST') send(201, await api.create(json(raw)));
     else if (m?.[1] && !m[2] && method === 'GET') send(200, api.show(decodeURIComponent(m[1])));
     else if (m?.[1] && !m[2] && method === 'PATCH') send(200, await api.update(decodeURIComponent(m[1]), json(raw)));
     else if (m?.[1] && m[2] === 'move' && method === 'POST') send(200, await api.move(decodeURIComponent(m[1]), json(raw)));
+    else if (m?.[1] && m[2] === 'rank' && method === 'POST') send(200, await api.rank(decodeURIComponent(m[1]), json(raw)));
     else if (m?.[1] && m[2] === 'comments' && method === 'POST') send(201, await api.comment(decodeURIComponent(m[1]), json(raw)));
-    else if (m || path === '/api/tree' || path === '/api/validate') send(405, { error: `${method} is not allowed on ${path}` });
+    else if (m || path === '/api/board' || path === '/api/tree' || path === '/api/validate') send(405, { error: `${method} is not allowed on ${path}` });
     else return false;
   } catch (e) {
     if (e instanceof ApiError) send(e.status, { error: e.message });

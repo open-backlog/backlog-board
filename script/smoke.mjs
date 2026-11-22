@@ -49,6 +49,11 @@ try {
   if (health.board !== pkg.version || health.core !== core || health.backlog?.name !== 'shop' || !(health.backlog?.items > 0)) fail(`/api/health gave ${JSON.stringify(health)}`);
   else console.log(`smoke: /api/health reads the backlog through open-backlog ${core} (${health.backlog.name}, ${health.backlog.items} items)`);
 
+  const columns = await (await fetch(url + 'api/board')).json();
+  const cards = Object.values(columns.columns ?? {}).flat().length;
+  const listed = (await (await fetch(url + 'api/items?all=1')).json()).items.length;
+  if (!cards || cards !== listed) fail(`/api/board has ${cards} cards; /api/items has ${listed}`);
+  else console.log(`smoke: /api/board gives the columns (${Object.entries(columns.columns).map(([k, v]) => `${k} ${v.length}`).join(', ')})`);
   const tree = await (await fetch(url + 'api/tree')).json();
   const refused = await fetch(url + 'api/items/1.2.1/move', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"status":"doing"}' });
   if (!Array.isArray(tree) || !tree.length || refused.status !== 403) fail(`/api/tree gave ${JSON.stringify(tree).slice(0, 80)}; a change without the board's Origin got ${refused.status}`);

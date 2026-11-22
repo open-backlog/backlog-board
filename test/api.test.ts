@@ -6,6 +6,8 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { rankFor } from '../server/api.js';
+import type { BoardOut } from '../server/api.js';
 import { HOST, startBoard } from '../server/board.js';
 import type { Board } from '../server/board.js';
 
@@ -276,5 +278,87 @@ describe('/api/events', () => {
     await s.until(() => s.got.some(g => g.paths.some(p => p.startsWith('stories/doing/'))));
     expect(s.got.flatMap(g => g.paths).some(p => p.startsWith('stories/doing/'))).toBe(true);
     s.stop();
+  });
+});
+
+describe('the board: columns, filters and reordering (2.4.3)', () => {
+  const ids = (o: BoardOut) => Object.fromEntries(Object.entries(o.columns).map(([k, v]) => [k, v.map(c => c.id)]));
+
+  it('three columns, each in column order (rank first, then ID), with what a card shows', async () => {
+    const root = repo();
+    const b = await board(root);
+    const o = (await call(b, 'GET', '/api/board')).body as BoardOut;
+    const obList = JSON.parse(ob(root, 'list', '--json')) as { id: string; status: string }[];
+    for (const st of ['todo', 'doing', 'done'] as const) {
+      expect([...o.columns[st].map(c => c.id)].sort()).toEqual(obList.filter(i => i.status === st).map(i => i.id).sort());
+      const ranks = o.columns[st].map(c => c.rank);
+      const firstUnranked = ranks.indexOf(null);
+      expect(ranks.slice(firstUnranked === -1 ? ranks.length : firstUnranked).every(r => r === null)).toBe(true);
+    }
+    const card = Object.values(o.columns).flat().find(c => c.repo.length > 1);
+    expect(card).toMatchObject({ repo: ['shop-web', 'shop-ios'] });
+    expect(Object.values(o.columns).flat().some(c => c.assignee === 'ana')).toBe(true);
+    expect(o.options.repos).toEqual(['shop-api', 'shop-web', 'shop-ios']);
+    expect(o.options.types).toEqual(['story', 'bug', 'spike', 'task']);
+    expect(o.options.epics.map(e => e.id)).toEqual(['0', '1']);
+    expect(o.options.features.every(f => f.parent !== null)).toBe(true);
+    expect(o.hiddenDone).toBe(0);
+  });
+
+  it('filters as ob list does: under an epic or feature, by repo and by type', async () => {
+    const root = repo();
+    const b = await board(root);
+    const flat = async (q: string) => Object.values(((await call(b, 'GET', `/api/board?${q}`)).body as BoardOut).columns).flat().map(c => c.id).sort();
+    const obIds = (...args: string[]) => (JSON.parse(ob(root, 'list', '--json', ...args)) as { id: string }[]).map(i => i.id).sort();
+    expect(await flat('parent=1.2')).toEqual(obIds('--parent', '1.2'));
+    expect(await flat('parent=1')).toEqual(obIds('--parent', '1'));
+    expect(await flat('repo=shop-web')).toEqual(obIds('--repo', 'shop-web'));
+    expect(await flat('type=bug,spike')).toEqual(obIds('--type', 'bug,spike'));
+    expect(await flat('parent=1&type=story')).toEqual(obIds('--parent', '1', '--type', 'story'));
+  });
+
+  it('hides done items older than 30 days unless all=1, and counts them', async () => {
+    const root = repo();
+    const b = await board(root);
+    const old = new Date(Date.now() - 60 * 86_400_000).toISOString();
+    execFileSync('git', ['commit', '-q', '--allow-empty', '-m', 'later'], { cwd: root });
+    // Done long ago: the move to done is the commit that dates it.
+    const env = { ...process.env, GIT_AUTHOR_DATE: old, GIT_COMMITTER_DATE: old };
+    execFileSync(OB, ['done', '1.2.2'], { cwd: root, env });
+    const recent = (await call(b, 'GET', '/api/board')).body as BoardOut;
+    const all = (await call(b, 'GET', '/api/board?all=1')).body as BoardOut;
+    expect(recent.columns.done.map(c => c.id)).not.toContain('1.2.2');
+    expect(recent.hiddenDone).toBe(1);
+    expect(all.columns.done.map(c => c.id)).toContain('1.2.2');
+    expect(all.hiddenDone).toBe(0);
+  });
+
+  it("reordering changes only the moved card's rank, in one commit, and puts it there", async () => {
+    const root = repo();
+    const b = await board(root);
+    const before = ids((await call(b, 'GET', '/api/board')).body as BoardOut)['todo'] ?? [];
+    expect(before.length).toBeGreaterThanOrEqual(3);
+    const last = before[before.length - 1] ?? '';
+    const r = await call(b, 'POST', `/api/items/${last}/rank`, { after: null });
+    expect(r.status).toBe(200);
+    expect(head(root)[0]).toBe(`ob: edit ${last} rank`);
+    expect(head(root)).toHaveLength(2);
+    const diff = git(root, 'diff', '-U0', 'HEAD~1', 'HEAD').split('\n').filter(l => /^[+-](?![+-]{2})/.test(l));
+    expect(diff.every(l => /^[+-]rank: /.test(l))).toBe(true);
+    expect(ids((await call(b, 'GET', '/api/board')).body as BoardOut)['todo']?.[0]).toBe(last);
+    expect((await call(b, 'POST', `/api/items/${last}/rank`, { after: 'nope' })).status).toBe(400);
+    expect((await call(b, 'POST', '/api/items/1/rank', { after: null })).status).toBe(400);
+  });
+
+  it('rankFor: halfway between ranked cards, after the last ranked, at the top, and never among unranked ones', () => {
+    const col = [{ id: 'a', rank: 10 }, { id: 'b', rank: 20 }, { id: 'c', rank: null }, { id: 'd', rank: null }, { id: 'x', rank: null }];
+    expect(rankFor(col, 'x', null)).toBe(9);
+    expect(rankFor(col, 'x', 'a')).toBe(15);
+    expect(rankFor(col, 'x', 'b')).toBe(21);
+    expect(rankFor(col, 'x', 'c')).toBe(21);
+    expect(rankFor(col, 'x', 'd')).toBe(21);
+    expect(rankFor([{ id: 'c', rank: null }, { id: 'x', rank: null }], 'x', null)).toBe(1);
+    expect(rankFor([{ id: 'c', rank: null }, { id: 'x', rank: null }], 'x', 'c')).toBe(1);
+    expect(() => rankFor(col, 'x', 'zz')).toThrow(/not in that column/);
   });
 });

@@ -4,9 +4,34 @@ The local board for [Open Backlog](https://openbacklog.org): a web board over a 
 Markdown files in git, published to npm as **`open-backlog-board`**. `ob serve` starts it for
 the backlog you're in and opens your browser. You never build anything: the app ships built.
 
-**Status: the API (2.4.2).** The server answers on this computer only, with the JSON API below;
-the app shows which backlog it serves and updates as files change. The columns, item editor,
-plan view and Sync arrive in 2.4.3–2.4.6, and the npm package in 2.4.7 (`private` until then).
+**Status: the board view (2.4.3).** Columns of cards you drag to move or reorder, with filters,
+over the JSON API below. The item editor, plan view and Sync arrive in 2.4.4–2.4.6, and the npm
+package in 2.4.7 (`private` until then).
+
+## Try it
+
+From this checkout, on any repository with a `backlog/` (a scratch copy is safest: every drag is
+a real commit there):
+
+```sh
+npm install
+npm start -- --dir ~/path/to/repo     # builds, then http://127.0.0.1:4310/
+```
+
+## The board
+
+- **Columns:** todo, doing and done, each card with its ID, type, title, repos and assignee, in
+  column order: cards with a `rank` first, lowest first, then by ID (the spec's order, from
+  open-backlog). Done shows the last 30 days; "All done items" shows the rest.
+- **Drag to another column** to move a card: the same commit as `ob move`. It lands in that
+  column's order. The ← → buttons on a card do the same without a mouse.
+- **Drag within a column** to reorder: only that card's `rank` changes, in one commit
+  (`ob: edit 1.2.2 rank`). Cards without a rank come after ranked ones, so a card dropped among
+  them goes just after the ranked cards instead: changing other cards' ranks to fit it would
+  change files you didn't touch.
+- **Filters:** epic, then its features, repo and type.
+- A change the server refuses (such as a card whose file has your uncommitted edits) shows its
+  message, and the cards go back to where they are on disk. Edits made in an editor appear at once.
 
 ## How it works
 
@@ -32,6 +57,7 @@ Each route calls the same `open-backlog` function as the `ob` command, so it ans
 |---|---|
 | `GET /api/items?status=&type=&parent=&repo=&assignee=&sprint=&all=1` | stories, bugs, spikes and tasks, as `ob list` (filters take comma lists) |
 | `GET /api/items/:id` | one item, as `ob show --json` |
+| `GET /api/board?parent=&repo=&type=&all=1` | the three columns in column order, the hidden done count, and the filter choices |
 | `GET /api/tree?all=1` | the plan with progress, as `ob tree --json` |
 | `GET /api/validate` | every problem, as `ob validate --json` |
 | `GET /api/events` | server-sent events: `change`, with the paths, whenever a file in the backlog changes |
@@ -39,6 +65,7 @@ Each route calls the same `open-backlog` function as the `ob` command, so it ans
 | `POST /api/items/:id/move` `{ status }` | as `ob move` |
 | `PATCH /api/items/:id` `{ fields: { name: value } }` | change front-matter fields (`null` removes one) |
 | `POST /api/items/:id/comments` `{ text, handle? }` | as `ob comment` |
+| `POST /api/items/:id/rank` `{ after }` | reorder in its column, after that card (`null`: the top), by its own `rank` |
 
 Every change is one commit of only the files it touched, with the CLI's message
 (`ob: move 2.3.4 to doing`, `ob: edit 2.3.4 assignee`). Your other work is never included: files
@@ -71,7 +98,7 @@ another backlog: `npm run dev -- --dir ../my-repo/backlog`.
 | `server/board.ts` | `startBoard()`: the server, its host and origin checks, and the app's files |
 | `server/api.ts` | the API over `open-backlog`, and the events |
 | `server/main.ts` | the `open-backlog-board` command |
-| `app/` | the Angular app (`app/src`), its config and the dev proxy |
+| `app/` | the Angular app (`app/src`): the shell (`app.ts`), the board (`board.ts`), the events, its config and the dev proxy |
 | `test/` | the server's tests (Vitest); the app's tests are `app/src/**/*.spec.ts` (`ng test`) |
 | `test/fixtures/` | two of backlog-spec's example backlogs, copied by `script/sync-fixtures.sh` |
 | `script/sync-art.sh` | copies backlog-art's tokens, fonts and icons into the app |

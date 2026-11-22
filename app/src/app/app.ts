@@ -6,6 +6,7 @@ import type { Filters } from './board-api';
 import { BacklogEvents } from './events';
 import { loadHealth } from './health';
 import type { Health } from './health';
+import { Sync } from './sync';
 import { Tree } from './tree';
 import type { Focus } from './tree';
 
@@ -15,11 +16,11 @@ export type View = 'board' | 'tree';
  * The board's shell (2.4.1): the header, with the backlog it serves from /api/v1/health, read again
  * whenever the backlog changes (2.4.2), and two views: the board (2.4.3, 2.4.4) and the tree
  * (2.4.5), which opens the board filtered to a feature. The tree is /#tree, so a reload or Back
- * keeps it. Sync (2.4.6) comes next.
+ * keeps it. Sync (2.4.6) sits in the header.
  */
 @Component({
   selector: 'ob-root',
-  imports: [Board, Tree],
+  imports: [Board, Sync, Tree],
   styles: `
     .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--ob-border); }
     .bar img { width: 28px; height: 28px; border-radius: 6px; }
@@ -43,6 +44,7 @@ export type View = 'board' | 'tree';
       </nav>
       @if (health(); as h) {
         <span class="name">{{ h.backlog.name }} · {{ h.backlog.items }} items</span>
+        <ob-sync />
         <span class="facts" [title]="'board ' + h.board + ' · open-backlog ' + h.core + ' · spec ' + h.spec">open-backlog {{ h.core }}</span>
       }
     </header>

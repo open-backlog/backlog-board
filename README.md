@@ -4,10 +4,10 @@ The local board for [Open Backlog](https://openbacklog.org): a web board over a 
 Markdown files in git, published to npm as **`open-backlog-board`**. `ob serve` starts it for
 the backlog you're in and opens your browser. You never build anything: the app ships built.
 
-**Status: the board, item editor and tree (2.4.5).** Columns of cards you drag to move or
+**Status: the board, item editor, tree and Sync (2.4.6).** Columns of cards you drag to move or
 reorder, with filters; open a card to read and edit it, comment, or make a new item; the tree
-shows the whole plan's progress. Sync arrives in 2.4.6, and the npm package in 2.4.7 (`private`
-until then).
+shows the whole plan's progress; Sync shares your changes. The npm package arrives in 2.4.7
+(`private` until then).
 
 ## Try it
 
@@ -66,6 +66,29 @@ with a progress bar from its stories, bugs, spikes and tasks: done in green, doi
 done". The plan's total is at the top; epic 0's monthly features (the unplanned work) sit beside
 it with theirs. Click a feature or an epic to open the board filtered to it.
 
+## Sync
+
+Every change on the board is a commit in your repository, and none of it leaves your computer
+until you click **Sync** (top right). Beside it, "3 to share" counts your commits that aren't on
+the remote branch yet; click it to see them. Sync sends every commit on your branch that isn't
+shared, including ones you made outside the board.
+
+**Sync** runs `git pull --rebase`, then `git push`, with your own git: your name, SSH key or
+credential helper, hooks and settings. The board never asks for a password or a token. If git
+would have to ask, Sync stops with a message: check that `git pull` and `git push` work in a
+terminal. The board waits while Sync runs.
+
+- **A conflict** (your change and a teammate's touch the same lines) stops Sync before anything
+  is sent. git is left partway through the rebase, so you can see everything and nothing is
+  resolved for you. The board lists the files and the commands: fix the marked parts, then
+  `git add` and `git rebase --continue`, or `git rebase --abort` to go back. Until then the board
+  makes no changes, and the item whose file has conflict markers is left off it until it can be
+read again; **Check again** looks once you're done.
+- **Uncommitted changes** to tracked files stop Sync, since a pull would refuse them: commit or
+  stash them first. Untracked files are fine.
+- **A branch with no remote branch yet:** share it once from a terminal
+  (`git push -u origin <branch>`), then Sync.
+
 ## How it works
 
 - `server/`: a small HTTP server on **127.0.0.1 only**, so nothing else on the network can reach
@@ -100,6 +123,8 @@ beside it. Each route calls the same `open-backlog` function as the `ob` command
 | `PATCH /api/v1/items/:id` `{ fields?: { name: value }, description? }` | change front-matter fields (`null` removes one) and the description (the body up to `## Comments`) |
 | `POST /api/v1/items/:id/comments` `{ text, handle? }` | as `ob comment` |
 | `POST /api/v1/items/:id/rank` `{ after }` | reorder in its column, after that card (`null`: the top), by its own `rank` |
+| `GET /api/v1/sync` | branch, remote branch, commits not shared yet, uncommitted files, and any conflict in progress |
+| `POST /api/v1/sync` | Sync: `git pull --rebase`, then `git push`; `{ received, sent, status }`, or the reason and any conflict (`{ kind, files, steps }`) |
 
 Every change is one commit of only the files it touched, with the CLI's message
 (`ob: move 2.3.4 to doing`, `ob: edit 2.3.4 assignee`). Your other work is never included: files

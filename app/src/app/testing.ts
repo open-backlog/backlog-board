@@ -1,6 +1,7 @@
 import type { BoardData } from './board-api';
 import type { Health } from './health';
 import type { ItemView } from './item-api';
+import type { SyncStatus } from './sync-api';
 import type { Progress, TreeNode } from './tree-api';
 
 /** Test helpers: a stand-in EventSource and a fake server for fetch. Not part of the app's bundle. */
@@ -78,15 +79,25 @@ export function treeData(): TreeNode[] {
   ];
 }
 
+export function syncStatus(over: Partial<SyncStatus> = {}): SyncStatus {
+  return {
+    git: true, branch: 'main', upstream: 'origin/main', behind: 0, uncommitted: [], conflict: null,
+    unshared: [{ hash: 'c3c3c3c', subject: 'ob: comment on 1.1.2' }, { hash: 'b2b2b2b', subject: 'ob: move 1.2.1 to doing' }],
+    ...over,
+  };
+}
+
 export interface Call { method: string; url: string; body: unknown }
 
 /** A fake server: records each call and answers health, board, and changes (or a refusal). */
-export function fakeServer(opts: { refuse?: string; health?: () => Response } = {}) {
+export function fakeServer(opts: { refuse?: string; health?: () => Response; sync?: () => SyncStatus; syncPost?: () => Response } = {}) {
   const calls: Call[] = [];
   const fetchFn = async (url: string, init: RequestInit = {}) => {
     const method = init.method ?? 'GET';
     calls.push({ method, url, body: init.body ? JSON.parse(String(init.body)) : undefined });
     if (url === 'api/v1/health') return opts.health?.() ?? new Response(JSON.stringify(HEALTH));
+    if (url === 'api/v1/sync' && method === 'GET') return new Response(JSON.stringify(opts.sync?.() ?? syncStatus()));
+    if (url === 'api/v1/sync' && method === 'POST') return opts.syncPost?.() ?? new Response(JSON.stringify({ received: 1, sent: 2, status: syncStatus({ unshared: [] }) }));
     if (url === 'api/v1/tree') return new Response(JSON.stringify(treeData()));
     if (url.startsWith('api/v1/board')) return new Response(JSON.stringify(boardData()));
     if (/^api\/v1\/items\/[^/]+$/.test(url) && method === 'GET') return new Response(JSON.stringify(itemView()));

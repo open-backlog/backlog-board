@@ -58,6 +58,10 @@ try {
   const refused = await fetch(url + 'api/v1/items/1.2.1/move', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"status":"doing"}' });
   if (!Array.isArray(tree) || !tree.length || refused.status !== 403) fail(`/api/v1/tree gave ${JSON.stringify(tree).slice(0, 80)}; a change without the board's Origin got ${refused.status}`);
   else console.log(`smoke: /api/v1/tree gives the plan (${tree.length} top items), and a change without the board's Origin is refused`);
+  const sync = await (await fetch(url + 'api/v1/sync')).json();
+  const syncRefused = await fetch(url + 'api/v1/sync', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+  if (typeof sync.git !== 'boolean' || !Array.isArray(sync.unshared) || syncRefused.status !== 403) fail(`/api/v1/sync gave ${JSON.stringify(sync).slice(0, 80)}; Sync without the board's Origin got ${syncRefused.status}`);
+  else console.log(`smoke: /api/v1/sync answers (git: ${sync.git}), and Sync without the board's Origin is refused`);
 } catch (e) {
   fail(e.message);
 } finally {

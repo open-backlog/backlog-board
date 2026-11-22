@@ -27,6 +27,7 @@ describe('the board shell', () => {
     expect(el.querySelector('.bar .facts')?.getAttribute('title')).toBe('board 0.0.0 · open-backlog 0.2.0 · spec 0.1');
     expect(el.querySelector('.bar img')?.getAttribute('src')).toBe('board-icon.png');
     expect(el.querySelector('ob-board')).not.toBeNull();
+    expect(el.querySelector('.bar ob-sync .count')?.textContent?.trim()).toBe('2 to share');
     expect(FakeEvents.last?.url).toBe('api/v1/events');
     const before = server.calls.filter(c => c.url === 'api/v1/health').length;
     FakeEvents.last?.fire();

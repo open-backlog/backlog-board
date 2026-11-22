@@ -9,6 +9,8 @@ import {
 } from 'open-backlog';
 import type { Backlog, FieldValue, Item, ListFilters, Node, Progress, Status } from 'open-backlog';
 
+import { conflictOf, sync, SyncError, syncStatus } from './sync.js';
+
 /**
  * The board's JSON API (2.4.2): HTTP in front of open-backlog, the same functions the ob command
  * calls, so the board and the CLI can't disagree (D1). Every change is one commit of only the
@@ -27,6 +29,8 @@ import type { Backlog, FieldValue, Item, ListFilters, Node, Progress, Status } f
  *   PATCH  /api/v1/items/:id             { fields?: { name: value | null }, description? }   an edit, one commit
  *   POST   /api/v1/items/:id/comments    { text, handle? }                      as ob comment
  *   POST   /api/v1/items/:id/rank        { after: id | null }                   reorder in its column (its rank only)
+ *   GET    /api/v1/sync                                                         what isn't shared yet, and any conflict
+ *   POST   /api/v1/sync                                                         Sync: git pull --rebase, then git push (2.4.6)
  */
 
 const STATUSES: readonly Status[] = ['todo', 'doing', 'done'];
@@ -125,6 +129,12 @@ export function createApi(opts: ApiOptions) {
     queue = next.catch(() => undefined);
     return next;
   };
+  /** A change: one at a time, and none while a Sync conflict (or your own rebase or merge) is open. */
+  const change = <T>(fn: () => T): Promise<T> => serial(() => {
+    const open = conflictOf(backlogDir);
+    if (open) throw new ApiError(409, `a ${open.kind} is in progress${open.files.length ? ` (${open.files.join(', ')})` : ''}; finish it or undo it before changing the backlog`);
+    return fn();
+  });
 
   function one(b: Backlog, id: string): Item {
     const found = b.items.filter(i => i.id === id);
@@ -175,7 +185,7 @@ export function createApi(opts: ApiOptions) {
   };
 
   /** Reorders a card in its column by changing its rank alone, as one edit (ob: edit <id> rank). */
-  const rank = (id: string, body: Record<string, unknown>) => serial(() => {
+  const rank = (id: string, body: Record<string, unknown>) => change(() => {
     const after = body['after'] === null || body['after'] === undefined ? null : text(body, 'after');
     const b = load();
     const item = one(b, id);
@@ -206,7 +216,7 @@ export function createApi(opts: ApiOptions) {
     return { backlog: backlog?.dir ?? backlogDir, valid: errors === 0, errors, warnings: problems.length - errors, problems };
   };
 
-  const create = (body: Record<string, unknown>) => serial(() => {
+  const create = (body: Record<string, unknown>) => change(() => {
     const r = addItem(load(), {
       type: text(body, 'type'), title: text(body, 'title'),
       ...(body['parent'] != null ? { parent: text(body, 'parent') } : {}),
@@ -216,7 +226,7 @@ export function createApi(opts: ApiOptions) {
     return r;
   });
 
-  const move = (id: string, body: Record<string, unknown>) => serial(() => {
+  const move = (id: string, body: Record<string, unknown>) => change(() => {
     const status = text(body, 'status') as Status;
     if (!STATUSES.includes(status)) throw new ApiError(400, `"${status}" is not a status: use todo, doing or done`);
     const b = load();
@@ -232,7 +242,7 @@ export function createApi(opts: ApiOptions) {
    * ("ob: edit 2.3.4 assignee, description"). If the change gives the item a problem ob validate
    * reports, the file is put back and the problem is the answer.
    */
-  const update = (id: string, body: Record<string, unknown>) => serial(() => updateNow(id, body));
+  const update = (id: string, body: Record<string, unknown>) => change(() => updateNow(id, body));
   function updateNow(id: string, body: Record<string, unknown>) {
     const fields = body['fields'] ?? {};
     const description = body['description'];
@@ -271,7 +281,7 @@ export function createApi(opts: ApiOptions) {
     return { path: item.path, changed: true, committed };
   }
 
-  const comment = (id: string, body: Record<string, unknown>) => serial(() => {
+  const comment = (id: string, body: Record<string, unknown>) => change(() => {
     one(load(), id);
     return addComment(load(), id, {
       text: text(body, 'text'),
@@ -286,7 +296,11 @@ export function createApi(opts: ApiOptions) {
     return { ...showItem(load(), id), description: descriptionOf(item.body) };
   };
 
-  return { list, board, tree, validation, create, move, update, rank, comment, show };
+  return {
+    list, board, tree, validation, create, move, update, rank, comment, show,
+    syncStatus: () => syncStatus(backlogDir),
+    sync: () => serial(() => sync(backlogDir)),
+  };
 }
 
 export type Api = ReturnType<typeof createApi>;
@@ -346,10 +360,13 @@ export async function route(api: Api, req: IncomingMessage, path: string, raw: B
     else if (m?.[1] && m[2] === 'move' && method === 'POST') send(200, await api.move(decodeURIComponent(m[1]), json(raw)));
     else if (m?.[1] && m[2] === 'rank' && method === 'POST') send(200, await api.rank(decodeURIComponent(m[1]), json(raw)));
     else if (m?.[1] && m[2] === 'comments' && method === 'POST') send(201, await api.comment(decodeURIComponent(m[1]), json(raw)));
-    else if (m || path === '/api/v1/board' || path === '/api/v1/tree' || path === '/api/v1/validate') send(405, { error: `${method} is not allowed on ${path}` });
+    else if (path === '/api/v1/sync' && method === 'GET') send(200, api.syncStatus());
+    else if (path === '/api/v1/sync' && method === 'POST') send(200, await api.sync());
+    else if (m || path === '/api/v1/sync' || path === '/api/v1/board' || path === '/api/v1/tree' || path === '/api/v1/validate') send(405, { error: `${method} is not allowed on ${path}` });
     else return false;
   } catch (e) {
     if (e instanceof ApiError) send(e.status, { error: e.message });
+    else if (e instanceof SyncError) send(e.status, { error: e.message, conflict: e.conflict });
     else if (e instanceof BacklogError) send(/^no item /.test(e.message) ? 404 : 400, { error: e.message });
     else throw e;
   }

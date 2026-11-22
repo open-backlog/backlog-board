@@ -24,7 +24,7 @@ import type { Backlog, FieldValue, Item, ListFilters, Node, Progress, Status } f
  *   GET    /api/events                                                       server-sent events
  *   POST   /api/items                 { type, title, parent?, slug? }        as ob new
  *   POST   /api/items/:id/move        { status }                             as ob move
- *   PATCH  /api/items/:id             { fields: { name: value | null } }     an edit, one commit
+ *   PATCH  /api/items/:id             { fields?: { name: value | null }, description? }   an edit, one commit
  *   POST   /api/items/:id/comments    { text, handle? }                      as ob comment
  *   POST   /api/items/:id/rank        { after: id | null }                   reorder in its column (its rank only)
  */
@@ -228,13 +228,17 @@ export function createApi(opts: ApiOptions) {
   });
 
   /**
-   * Changes front-matter fields (null removes one). If the change gives the item a problem
-   * ob validate reports, the file is put back and the problem is the answer.
+   * Changes front-matter fields (null removes one) and/or the description, in one commit
+   * ("ob: edit 2.3.4 assignee, description"). If the change gives the item a problem ob validate
+   * reports, the file is put back and the problem is the answer.
    */
   const update = (id: string, body: Record<string, unknown>) => serial(() => updateNow(id, body));
   function updateNow(id: string, body: Record<string, unknown>) {
-    const fields = body['fields'];
-    if (!fields || typeof fields !== 'object' || Array.isArray(fields)) throw new ApiError(400, 'send { "fields": { "name": value } }; null removes a field');
+    const fields = body['fields'] ?? {};
+    const description = body['description'];
+    if (typeof fields !== 'object' || fields === null || Array.isArray(fields)) throw new ApiError(400, 'send { "fields": { "name": value } }; null removes a field');
+    if (description !== undefined && typeof description !== 'string') throw new ApiError(400, 'description is text (Markdown)');
+    if (!Object.keys(fields).length && description === undefined) throw new ApiError(400, 'send fields, a description, or both');
     const b = load();
     const item = one(b, id);
     const changes_: Record<string, FieldValue | undefined> = {};
@@ -247,14 +251,23 @@ export function createApi(opts: ApiOptions) {
     const path = join(backlogDir, item.path);
     const before = new Set(validateDir(backlogDir).problems.filter(p => p.path === item.path).map(p => `${p.code} ${p.message}`));
     const original = readText(path);
-    const changed = updateItem(backlogDir, item, changes_);
-    if (!changed) return { path: item.path, changed: false, committed: false };
+    if (Object.keys(changes_).length) updateItem(backlogDir, item, changes_);
+    if (description !== undefined) {
+      // The body as read, now after whatever front matter the field changes left.
+      const now = readText(path);
+      const after = withDescription(now, item.body, description);
+      if (after !== now) writeText(path, after);
+    }
+    const final = readText(path);
+    if (final === original) return { path: item.path, changed: false, committed: false };
     const added = validateDir(backlogDir).problems.filter(p => p.path === item.path && p.severity === 'error' && !before.has(`${p.code} ${p.message}`));
     if (added.length) {
       writeText(path, original);
       throw new ApiError(400, added.map(p => `${p.code} [${p.rule}] ${p.message}. Fix: ${p.fix}.`).join(' '));
     }
-    const committed = opts.commit ? commit([path], message.edit(id, Object.keys(changes_).join(', '))) : false;
+    const descChanged = description !== undefined && withDescription(original, item.body, description) !== original;
+    const what = [...Object.keys(changes_), ...(descChanged ? ['description'] : [])];
+    const committed = opts.commit ? commit([path], message.edit(id, what.join(', '))) : false;
     return { path: item.path, changed: true, committed };
   }
 
@@ -267,10 +280,45 @@ export function createApi(opts: ApiOptions) {
     });
   });
 
-  return { list, board, tree, validation, create, move, update, rank, comment, show: (id: string) => { one(load(), id); return showItem(load(), id); } };
+  /** ob show --json, plus the description: the body up to ## Comments, which the editor edits. */
+  const show = (id: string) => {
+    const item = one(load(), id);
+    return { ...showItem(load(), id), description: descriptionOf(item.body) };
+  };
+
+  return { list, board, tree, validation, create, move, update, rank, comment, show };
 }
 
 export type Api = ReturnType<typeof createApi>;
+
+const COMMENTS = /^## Comments[ \t]*$/m;
+
+/** An item's description: its body up to `## Comments` (which the spec puts last), or all of it. */
+export function descriptionOf(body: string): string {
+  const at = body.search(COMMENTS);
+  return at === -1 ? body : body.slice(0, at);
+}
+
+/**
+ * The file with a new description: the front matter byte for byte, the new description, then
+ * the comments as they were. `body` is the item's body as read (the end of the file).
+ */
+export function withDescription(file: string, body: string, description: string): string {
+  if (!file.endsWith(body)) throw new ApiError(409, 'the file changed while it was being edited; try again');
+  const front = file.slice(0, file.length - body.length);
+  const at = body.search(COMMENTS);
+  const comments = at === -1 ? '' : body.slice(at);
+  const nl = file.includes('\r\n') ? '\r\n' : '\n';
+  if (description.replace(/\s+$/, '') === descriptionOf(body).replace(/\s+$/, '')) return file;
+  let text = description.replace(/\r?\n/g, nl).replace(/\s+$/, '');
+  if (text) {
+    text += nl;
+    if (comments) text += nl;
+    // A blank line after the front matter, as ob new writes it.
+    if (!text.startsWith(nl)) text = nl + text;
+  } else if (comments) text = nl;
+  return front + text + comments;
+}
 
 function text(body: Record<string, unknown>, key: string): string {
   const v = body[key];

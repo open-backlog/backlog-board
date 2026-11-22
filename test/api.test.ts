@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { rankFor } from '../server/api.js';
+import { descriptionOf, rankFor, withDescription } from '../server/api.js';
 import type { BoardOut } from '../server/api.js';
 import { HOST, startBoard } from '../server/board.js';
 import type { Board } from '../server/board.js';
@@ -82,7 +82,9 @@ describe('reading: the same answers as ob', () => {
     const b = await board(root);
     expect((await call(b, 'GET', '/api/tree')).body).toEqual(JSON.parse(ob(root, 'tree', '--json')));
     expect((await call(b, 'GET', '/api/tree?all=1')).body).toEqual(JSON.parse(ob(root, 'tree', '--json', '--all')));
-    expect((await call(b, 'GET', `/api/items/${STORY}`)).body).toEqual(JSON.parse(ob(root, 'show', STORY, '--json')));
+    const { description, ...shown } = (await call(b, 'GET', `/api/items/${STORY}`)).body as Record<string, unknown>;
+    expect(shown).toEqual(JSON.parse(ob(root, 'show', STORY, '--json')));
+    expect(String(shown['text'])).toContain(String(description));
     const v = JSON.parse(execFileSync(OB, ['validate', '--json'], { cwd: root, encoding: 'utf8' })) as Record<string, unknown>;
     expect((await call(b, 'GET', '/api/validate')).body).toEqual({ backlog: v['backlog'], valid: v['valid'], errors: v['errors'], warnings: v['warnings'], problems: v['problems'] });
 
@@ -360,5 +362,80 @@ describe('the board: columns, filters and reordering (2.4.3)', () => {
     expect(rankFor([{ id: 'c', rank: null }, { id: 'x', rank: null }], 'x', null)).toBe(1);
     expect(rankFor([{ id: 'c', rank: null }, { id: 'x', rank: null }], 'x', 'c')).toBe(1);
     expect(() => rankFor(col, 'x', 'zz')).toThrow(/not in that column/);
+  });
+});
+
+describe('the item editor (2.4.4)', () => {
+  it('edits the description in one commit: front matter byte for byte, comments kept', async () => {
+    const root = repo();
+    const b = await board(root);
+    await call(b, 'POST', `/api/items/${STORY}/comments`, { text: 'First thoughts' });
+    const item = (await call(b, 'GET', `/api/items/${STORY}`)).body as { path: string; text: string; description: string };
+    const abs = join(root, 'backlog', item.path);
+    const front = item.text.slice(0, item.text.indexOf('---', 3) + 4);
+    const r = await call(b, 'PATCH', `/api/items/${STORY}`, { description: 'A new description.\n\n- with a list\n' });
+    expect(r).toEqual({ status: 200, body: { path: item.path, changed: true, committed: true } });
+    expect(head(root)).toEqual([`ob: edit ${STORY} description`, `M\tbacklog/${item.path}`]);
+    const after = readFileSync(abs, 'utf8');
+    expect(after.startsWith(front)).toBe(true);
+    expect(after).toContain('\nA new description.\n\n- with a list\n\n## Comments\n- ');
+    expect(after).toContain('@ana: First thoughts');
+    const shown = (await call(b, 'GET', `/api/items/${STORY}`)).body as { description: string; comments: unknown[] };
+    expect(shown.description).toBe('\nA new description.\n\n- with a list\n\n');
+    expect(shown.comments).toHaveLength(1);
+    expect((await call(b, 'PATCH', `/api/items/${STORY}`, { description: shown.description })).body).toEqual({ path: item.path, changed: false, committed: false });
+  });
+
+  it('fields and description together are one commit; a custom field survives', async () => {
+    const root = repo();
+    const b = await board(root);
+    const item = (await call(b, 'GET', `/api/items/${STORY}`)).body as { path: string };
+    const abs = join(root, 'backlog', item.path);
+    writeFileSync(abs, readFileSync(abs, 'utf8').replace(/\n---\n/, '\ncustomer: acme\n---\n'));
+    git(root, 'commit', '-qam', 'custom field');
+    await call(b, 'PATCH', `/api/items/${STORY}`, { fields: { assignee: 'raj', title: 'Card form, renamed' }, description: 'Rewritten.' });
+    expect(head(root)[0]).toBe(`ob: edit ${STORY} assignee, title, description`);
+    const text = readFileSync(abs, 'utf8');
+    expect(text).toContain('customer: acme');
+    expect(text).toContain('title: Card form, renamed');
+    expect(text).toContain('assignee: raj');
+    expect(text).toMatch(/\n---\n\nRewritten\.\n/);
+    expect(git(root, 'status', '--porcelain')).toBe('');
+  });
+
+  it('refuses a change ob validate would report, and leaves the description as it was', async () => {
+    const root = repo();
+    const b = await board(root);
+    const r = await call(b, 'PATCH', `/api/items/${STORY}`, { fields: { parent: '' }, description: 'Changed' });
+    expect(r.status).toBe(400);
+    expect(git(root, 'status', '--porcelain')).toBe('');
+    expect((await call(b, 'PATCH', `/api/items/${STORY}`, {})).status).toBe(400);
+    expect((await call(b, 'PATCH', `/api/items/${STORY}`, { description: 3 })).status).toBe(400);
+  });
+
+  it('creates a story, bug, feature and epic as ob new does; a bug with no parent goes to epic 0', async () => {
+    const root = repo();
+    const other = twin(root);
+    const b = await board(root);
+    for (const [type, title, parent] of [['story', 'Wish list', '1.2'], ['bug', 'Totals off', null], ['feature', 'Returns', '1'], ['epic', 'Loyalty', null]] as const) {
+      const r = await call(b, 'POST', '/api/items', { type, title, ...(parent ? { parent } : {}) });
+      expect(r.status, `${type} ${JSON.stringify(r.body)}`).toBe(201);
+      ob(other, 'new', type, title, ...(parent ? ['--parent', parent] : []));
+      expect(head(root)).toEqual(head(other));
+    }
+    const missing = await call(b, 'POST', '/api/items', { type: 'story', title: 'Orphan' });
+    expect(missing.status).toBe(400);
+    expect((missing.body as { error: string }).error).toContain('needs --parent');
+  });
+
+  it('withDescription and descriptionOf: CRLF, no comments, an empty description', () => {
+    const file = '---\r\nid: 1\r\n---\r\n\r\nOld.\r\n\r\n## Comments\r\n- 2026-11-01 @jo: hi\r\n';
+    const body = '\r\nOld.\r\n\r\n## Comments\r\n- 2026-11-01 @jo: hi\r\n';
+    expect(descriptionOf(body)).toBe('\r\nOld.\r\n\r\n');
+    expect(withDescription(file, body, 'New\nlines')).toBe('---\r\nid: 1\r\n---\r\n\r\nNew\r\nlines\r\n\r\n## Comments\r\n- 2026-11-01 @jo: hi\r\n');
+    expect(withDescription('---\nid: 1\n---\n', '', 'Text')).toBe('---\nid: 1\n---\n\nText\n');
+    expect(withDescription('---\nid: 1\n---\n\nOld\n', '\nOld\n', '')).toBe('---\nid: 1\n---\n');
+    expect(withDescription('---\nid: 1\n---\n\nOld\n', '\nOld\n', 'Old')).toBe('---\nid: 1\n---\n\nOld\n');
+    expect(() => withDescription('other', '\nOld\n', 'x')).toThrow(/changed while/);
   });
 });

@@ -1,5 +1,6 @@
 import type { BoardData } from './board-api';
 import type { Health } from './health';
+import type { ItemView } from './item-api';
 
 /** Test helpers: a stand-in EventSource and a fake server for fetch. Not part of the app's bundle. */
 export class FakeEvents {
@@ -33,6 +34,22 @@ export function boardData(): BoardData {
   };
 }
 
+export function itemView(): ItemView {
+  return {
+    id: '1.1.2', type: 'story', title: 'Card page', path: 'stories/doing/1.1.2-card-page.md',
+    breadcrumb: ['1-checkout', '1.1-cart', '1.1.2-card-page'], status: 'doing',
+    fields: { id: '1.1.2', type: 'story', title: 'Card page', parent: '1.1', estimate: 3, repo: ['shop-web', 'shop-ios'], customer: 'acme' },
+    text: '', progress: null, children: [], deleted: null, sameId: [],
+    history: [
+      { hash: 'c3', date: '2026-11-21', author: 'Ana', subject: 'ob: edit 1.1.2 estimate' },
+      { hash: 'b2', date: '2026-11-20', author: 'Ana', subject: 'ob: move 1.1.2 to doing' },
+      { hash: 'a1', date: '2026-11-18', author: 'Raj', subject: 'ob: add 1.1.2 Card page' },
+    ],
+    comments: [{ date: '2026-11-20', handle: 'ana', text: 'Started' }],
+    description: '\n**As a** shopper, **I want to:**\n- pay by card\n\n',
+  };
+}
+
 export interface Call { method: string; url: string; body: unknown }
 
 /** A fake server: records each call and answers health, board, and changes (or a refusal). */
@@ -43,6 +60,8 @@ export function fakeServer(opts: { refuse?: string; health?: () => Response } = 
     calls.push({ method, url, body: init.body ? JSON.parse(String(init.body)) : undefined });
     if (url === 'api/health') return opts.health?.() ?? new Response(JSON.stringify(HEALTH));
     if (url.startsWith('api/board')) return new Response(JSON.stringify(boardData()));
+    if (/^api\/items\/[^/]+$/.test(url) && method === 'GET') return new Response(JSON.stringify(itemView()));
+    if (url === 'api/items' && method === 'POST' && !opts.refuse) return new Response(JSON.stringify({ id: '1.1.9' }), { status: 201 });
     if (opts.refuse) return new Response(JSON.stringify({ error: opts.refuse }), { status: 409 });
     return new Response(JSON.stringify({ committed: true }));
   };

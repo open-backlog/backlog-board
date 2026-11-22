@@ -24,6 +24,9 @@
 .type { color: var(--ob-muted); }
 .type.bug { color: var(--ob-brand); }
 .title { margin: 0.25rem 0; font-size: 0.9375rem; line-height: 1.35; }
+.open { background: none; border: none; padding: 0; text-align: left; color: inherit; font: inherit; cursor: pointer; }
+.open:hover, .open:focus-visible { color: var(--ob-brand); text-decoration: underline; }
+.new { margin-left: auto; background: var(--ob-brand); color: var(--ob-surface); border: none; border-radius: 6px; padding: 0.3125rem 0.875rem; font-weight: var(--ob-weight-bold); }
 .meta { display: flex; flex-wrap: wrap; gap: 0.25rem 0.5rem; font-family: var(--ob-font-mono); font-size: 0.6875rem; color: var(--ob-muted); }
 .repo { border: 1px solid var(--ob-border); border-radius: 4px; padding: 0 0.25rem; }
 .meta { align-items: center; min-height: 1.25rem; }

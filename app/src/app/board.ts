@@ -5,16 +5,19 @@ import { Component, computed, effect, inject, signal } from '@angular/core';
 import { loadBoard, moveCard, NO_FILTERS, rankCard, STATUSES } from './board-api';
 import type { BoardData, Card, Filters, Status } from './board-api';
 import { BacklogEvents } from './events';
+import { ItemPanel } from './item-panel';
+import { NewItem } from './new-item';
 
 /**
  * The board (2.4.3): todo, doing and done columns of cards, in column order (rank, then ID).
+ * A card's title opens it in the item panel, and + New makes an item (2.4.4).
  * Dragging a card to another column moves it (ob move); dragging it within its column changes
  * its rank alone; the ← → buttons move it without a mouse. Every change is the server's, one
  * commit each, and the columns are read again after it, and whenever the backlog changes.
  */
 @Component({
   selector: 'ob-board',
-  imports: [CdkDropListGroup, CdkDropList, CdkDrag, CdkDragPlaceholder],
+  imports: [CdkDropListGroup, CdkDropList, CdkDrag, CdkDragPlaceholder, ItemPanel, NewItem],
   styleUrl: './board.css',
   template: `
     <form class="filters" aria-label="Filters" (submit)="$event.preventDefault()">
@@ -45,6 +48,7 @@ import { BacklogEvents } from './events';
         </select>
       </label>
       <label class="check"><input type="checkbox" [checked]="filters().all" (change)="set({ all: checked($event) })"> All done items</label>
+      <button type="button" class="new" (click)="creating.set(true); open.set(null)">+ New</button>
     </form>
 
     @if (error(); as e) { <p class="error" role="alert">{{ e }} <button type="button" (click)="error.set(null)">Dismiss</button></p> }
@@ -60,7 +64,7 @@ import { BacklogEvents } from './events';
                   <span class="id">{{ c.id }}</span>
                   <span class="type" [class.bug]="c.type === 'bug'">{{ c.type }}</span>
                 </div>
-                <p class="title">{{ c.title }}</p>
+                <p class="title"><button type="button" class="open" (click)="open.set(c.id); creating.set(false)">{{ c.title }}</button></p>
                 <div class="meta">
                   @for (r of c.repo; track r) { <span class="repo">{{ r }}</span> }
                   @if (c.assignee) { <span class="who">&#64;{{ c.assignee }}</span> }
@@ -82,9 +86,18 @@ import { BacklogEvents } from './events';
         </section>
       }
     </div>
+
+    @if (open(); as id) { <ob-item-panel [id]="id" (closed)="open.set(null)" (opened)="open.set($event)" /> }
+    @if (creating()) {
+      <ob-new-item [epics]="data()?.options?.epics ?? []" [features]="data()?.options?.features ?? []"
+        (closed)="creating.set(false)" (created)="creating.set(false); open.set($event)" />
+    }
   `,
 })
 export class Board {
+  /** The item open in the panel, if any; a new-item form instead while creating. */
+  readonly open = signal<string | null>(null);
+  readonly creating = signal(false);
   readonly statuses = STATUSES;
   readonly filters = signal<Filters>(NO_FILTERS);
   readonly data = signal<BoardData | null>(null);

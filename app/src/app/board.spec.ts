@@ -104,6 +104,17 @@ describe('the board', () => {
     expect(board.columns().todo.map(c => c.id)).toEqual(['1.1.1', '1.1.2', '0.1.1']);
   });
 
+  it("a card's title opens it in the item panel; + New opens the form instead", async () => {
+    const { el, fixture, settle } = await render();
+    (el.querySelector('[data-id="1.1.2"] .open') as HTMLButtonElement).click();
+    await settle();
+    expect(el.querySelector('ob-item-panel')).not.toBeNull();
+    (el.querySelector('.new') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(el.querySelector('ob-item-panel')).toBeNull();
+    expect(el.querySelector('ob-new-item')).not.toBeNull();
+  });
+
   it('reads the board again when the backlog changes', async () => {
     const { server, settle } = await render();
     const before = server.calls.length;

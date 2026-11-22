@@ -39,7 +39,7 @@
     "build:server": "rm -rf dist/server && tsc -p tsconfig.server.json && chmod +x dist/server/main.js",
     "build:app": "ng build",
     "lint": "eslint . && tsc --noEmit && tsc -p app/tsconfig.app.json --noEmit",
-    "test": "vitest run && ng test",
+    "test": "vitest run && ng test --watch=false",
     "smoke": "node script/smoke.mjs",
     "check": "npm run lint && npm run build && npm test && npm run smoke",
     "sync-art": "./script/sync-art.sh",

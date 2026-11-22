@@ -50,15 +50,15 @@ describe('the board', () => {
     const { server, board, el, settle } = await render();
     board.set({ epic: '1' });
     await settle();
-    expect([...el.querySelectorAll('select')[1]!.querySelectorAll('option')].map(o => o.value)).toEqual(['', '1.1']);
+    expect([...el.querySelectorAll('select')[1]!.querySelectorAll('option')].map(o => o.value)).toEqual(['', '1.1', '1.2']);
     board.set({ feature: '1.1', repo: 'shop-web', type: 'story' });
     await settle();
-    expect(server.calls.at(-1)?.url).toBe('api/board?parent=1.1&repo=shop-web&type=story');
+    expect(server.calls.at(-1)?.url).toBe('api/v1/board?parent=1.1&repo=shop-web&type=story');
     (el.querySelector('.hidden-done button') as HTMLButtonElement).click();
     await settle();
-    expect(server.calls.at(-1)?.url).toBe('api/board?parent=1.1&repo=shop-web&type=story&all=1');
-    expect(boardQuery(NO_FILTERS)).toBe('api/board');
-    expect(boardQuery({ ...NO_FILTERS, epic: '1' })).toBe('api/board?parent=1');
+    expect(server.calls.at(-1)?.url).toBe('api/v1/board?parent=1.1&repo=shop-web&type=story&all=1');
+    expect(boardQuery(NO_FILTERS)).toBe('api/v1/board');
+    expect(boardQuery({ ...NO_FILTERS, epic: '1' })).toBe('api/v1/board?parent=1');
   });
 
   it('a drop in another column moves the card there (ob move), then reads the board again', async () => {
@@ -70,8 +70,8 @@ describe('the board', () => {
     expect(board.columns().todo.map(c => c.id)).toEqual(['1.1.1', '0.1.1']);
     await done;
     const changes = server.calls.filter(c => c.method === 'POST');
-    expect(changes).toEqual([{ method: 'POST', url: 'api/items/1.1.2/move', body: { status: 'doing' } }]);
-    expect(server.calls.at(-1)?.url).toBe('api/board');
+    expect(changes).toEqual([{ method: 'POST', url: 'api/v1/items/1.1.2/move', body: { status: 'doing' } }]);
+    expect(server.calls.at(-1)?.url).toBe('api/v1/board');
   });
 
   it('a drop within a column reorders it: the card goes after the one now above it, or to the top', async () => {
@@ -81,8 +81,8 @@ describe('the board', () => {
     await board.dropped(drop('todo', 'todo', 0, 2, todo[0]!));
     await board.dropped(drop('todo', 'todo', 1, 1, todo[1]!));
     expect(server.calls.filter(c => c.method === 'POST')).toEqual([
-      { method: 'POST', url: 'api/items/0.1.1/rank', body: { after: null } },
-      { method: 'POST', url: 'api/items/1.1.1/rank', body: { after: '0.1.1' } },
+      { method: 'POST', url: 'api/v1/items/0.1.1/rank', body: { after: null } },
+      { method: 'POST', url: 'api/v1/items/1.1.1/rank', body: { after: '0.1.1' } },
     ]);
   });
 
@@ -92,7 +92,7 @@ describe('the board', () => {
     expect(buttons.map(b => b.getAttribute('aria-label'))).toEqual(['Move 1.1.3 to todo', 'Move 1.1.3 to done']);
     buttons[1]!.click();
     await new Promise(r => setTimeout(r));
-    expect(server.calls.find(c => c.method === 'POST')).toEqual({ method: 'POST', url: 'api/items/1.1.3/move', body: { status: 'done' } });
+    expect(server.calls.find(c => c.method === 'POST')).toEqual({ method: 'POST', url: 'api/v1/items/1.1.3/move', body: { status: 'done' } });
     expect(el.querySelectorAll('[data-id="1.1.1"] .nav button').length).toBe(1);
   });
 
@@ -120,6 +120,6 @@ describe('the board', () => {
     const before = server.calls.length;
     FakeEvents.last?.fire();
     await settle();
-    expect(server.calls.slice(before).map(c => c.url)).toEqual(['api/board']);
+    expect(server.calls.slice(before).map(c => c.url)).toEqual(['api/v1/board']);
   });
 });

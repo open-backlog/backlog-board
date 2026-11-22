@@ -20,7 +20,7 @@ describe('the new item form', () => {
   it('offers features as parents for a story, epics for a feature, none for an epic', async () => {
     const { form, fixture, el } = await render();
     const parents = () => [...el.querySelectorAll('select[aria-label="Parent"] option')].map(o => o.getAttribute('value'));
-    expect(parents()).toEqual(['', '0.1', '1.1']);
+    expect(parents()).toEqual(['', '0.1', '1.1', '1.2']);
     form.type.set('feature');
     fixture.detectChanges();
     expect(parents()).toEqual(['', '0', '1']);
@@ -37,7 +37,7 @@ describe('the new item form', () => {
     form.type.set('bug');
     form.title.set('  Totals off ');
     await form.create();
-    expect(server.calls.filter(c => c.method === 'POST')).toEqual([{ method: 'POST', url: 'api/items', body: { type: 'bug', title: 'Totals off' } }]);
+    expect(server.calls.filter(c => c.method === 'POST')).toEqual([{ method: 'POST', url: 'api/v1/items', body: { type: 'bug', title: 'Totals off' } }]);
     expect(opened).toBe('1.1.9');
   });
 

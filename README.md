@@ -4,9 +4,10 @@ The local board for [Open Backlog](https://openbacklog.org): a web board over a 
 Markdown files in git, published to npm as **`open-backlog-board`**. `ob serve` starts it for
 the backlog you're in and opens your browser. You never build anything: the app ships built.
 
-**Status: the board and item editor (2.4.4).** Columns of cards you drag to move or reorder,
-with filters; open a card to read and edit it, comment, or make a new item. The plan view and
-Sync arrive in 2.4.5–2.4.6, and the npm package in 2.4.7 (`private` until then).
+**Status: the board, item editor and tree (2.4.5).** Columns of cards you drag to move or
+reorder, with filters; open a card to read and edit it, comment, or make a new item; the tree
+shows the whole plan's progress. Sync arrives in 2.4.6, and the npm package in 2.4.7 (`private`
+until then).
 
 ## Try it
 
@@ -57,6 +58,14 @@ and the file is left as it was.
 title and parent (a feature for story-level items, an epic for a feature; a bug or task can go
 into this month's unplanned work), and it opens when it's made.
 
+## The tree
+
+**Tree** (at the top, or `/#tree`) shows the plan: capabilities, epics and features, nested, each
+with a progress bar from its stories, bugs, spikes and tasks: done in green, doing beside it, and
+"1 of 2 done (50%)", the same numbers as `ob tree`. A feature with nothing in it yet is "0 of 0
+done". The plan's total is at the top; epic 0's monthly features (the unplanned work) sit beside
+it with theirs. Click a feature or an epic to open the board filtered to it.
+
 ## How it works
 
 - `server/`: a small HTTP server on **127.0.0.1 only**, so nothing else on the network can reach
@@ -75,21 +84,22 @@ open-backlog-board [--dir <folder>] [--port <n>]   # default: here, port 4310
 
 ## The API
 
-Each route calls the same `open-backlog` function as the `ob` command, so it answers the same:
+Every route is under `/api/v1/`, so a later, different API can sit
+beside it. Each route calls the same `open-backlog` function as the `ob` command, so it answers the same:
 
 | Route | |
 |---|---|
-| `GET /api/items?status=&type=&parent=&repo=&assignee=&sprint=&all=1` | stories, bugs, spikes and tasks, as `ob list` (filters take comma lists) |
-| `GET /api/items/:id` | one item, as `ob show --json`, with its `description` |
-| `GET /api/board?parent=&repo=&type=&all=1` | the three columns in column order, the hidden done count, and the filter choices |
-| `GET /api/tree?all=1` | the plan with progress, as `ob tree --json` |
-| `GET /api/validate` | every problem, as `ob validate --json` |
-| `GET /api/events` | server-sent events: `change`, with the paths, whenever a file in the backlog changes |
-| `POST /api/items` `{ type, title, parent?, slug? }` | a new item, as `ob new` |
-| `POST /api/items/:id/move` `{ status }` | as `ob move` |
-| `PATCH /api/items/:id` `{ fields?: { name: value }, description? }` | change front-matter fields (`null` removes one) and the description (the body up to `## Comments`) |
-| `POST /api/items/:id/comments` `{ text, handle? }` | as `ob comment` |
-| `POST /api/items/:id/rank` `{ after }` | reorder in its column, after that card (`null`: the top), by its own `rank` |
+| `GET /api/v1/items?status=&type=&parent=&repo=&assignee=&sprint=&all=1` | stories, bugs, spikes and tasks, as `ob list` (filters take comma lists) |
+| `GET /api/v1/items/:id` | one item, as `ob show --json`, with its `description` |
+| `GET /api/v1/board?parent=&repo=&type=&all=1` | the three columns in column order, the hidden done count, and the filter choices |
+| `GET /api/v1/tree?all=1` | the plan with progress, as `ob tree --json` |
+| `GET /api/v1/validate` | every problem, as `ob validate --json` |
+| `GET /api/v1/events` | server-sent events: `change`, with the paths, whenever a file in the backlog changes |
+| `POST /api/v1/items` `{ type, title, parent?, slug? }` | a new item, as `ob new` |
+| `POST /api/v1/items/:id/move` `{ status }` | as `ob move` |
+| `PATCH /api/v1/items/:id` `{ fields?: { name: value }, description? }` | change front-matter fields (`null` removes one) and the description (the body up to `## Comments`) |
+| `POST /api/v1/items/:id/comments` `{ text, handle? }` | as `ob comment` |
+| `POST /api/v1/items/:id/rank` `{ after }` | reorder in its column, after that card (`null`: the top), by its own `rank` |
 
 Every change is one commit of only the files it touched, with the CLI's message
 (`ob: move 2.3.4 to doing`, `ob: edit 2.3.4 assignee`). Your other work is never included: files

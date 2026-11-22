@@ -1,6 +1,6 @@
 import type { Status } from './board-api';
 
-/** One item, as the server's GET /api/items/:id gives it: ob show --json plus the description. */
+/** One item, as the server's GET /api/v1/items/:id gives it: ob show --json plus the description. */
 export interface ItemView {
   id: string;
   type: string;
@@ -30,12 +30,12 @@ async function answer<T>(res: Response): Promise<T> {
 }
 const send = (method: string, path: string, body: unknown) =>
   fetch(path, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-const item = (id: string) => `api/items/${encodeURIComponent(id)}`;
+const item = (id: string) => `api/v1/items/${encodeURIComponent(id)}`;
 
 export const loadItem = async (id: string) => answer<ItemView>(await fetch(item(id)));
 export const saveItem = async (id: string, change: { fields?: Record<string, unknown>; description?: string }) => answer<{ changed: boolean }>(await send('PATCH', item(id), change));
 export const addComment = async (id: string, text: string) => answer<unknown>(await send('POST', `${item(id)}/comments`, { text }));
-export const createItem = async (n: { type: string; title: string; parent?: string }) => answer<{ id: string }>(await send('POST', 'api/items', n));
+export const createItem = async (n: { type: string; title: string; parent?: string }) => answer<{ id: string }>(await send('POST', 'api/v1/items', n));
 
 /** A field's value as text in the form: lists joined by commas. */
 export function fieldText(v: unknown): string {

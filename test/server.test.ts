@@ -60,12 +60,12 @@ describe('the board server', () => {
       });
       expect(reached, address).toBe(false);
     }
-    expect((await get(b.port, '/api/health')).status).toBe(200);
+    expect((await get(b.port, '/api/v1/health')).status).toBe(200);
   });
 
-  it('answers /api/health from open-backlog: the backlog, its items, the versions', async () => {
+  it('answers /api/v1/health from open-backlog: the backlog, its items, the versions', async () => {
     const b = await board();
-    const r = await get(b.port, '/api/health');
+    const r = await get(b.port, '/api/v1/health');
     expect(r.type).toBe('application/json');
     const core = JSON.parse(readFileSync(fileURLToPath(new URL('../node_modules/open-backlog/package.json', import.meta.url)), 'utf8')) as { version: string };
     const own = JSON.parse(readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8')) as { version: string };
@@ -86,16 +86,17 @@ describe('the board server', () => {
     expect((await get(b.port, '/item/2.3.4')).body).toContain('<ob-root>');
     expect((await get(b.port, '/missing.js')).status).toBe(404);
     expect((await get(b.port, '/%2e%2e/%2e%2e/package.json')).status).toBe(404);
-    expect((await get(b.port, '/api/nothing')).status).toBe(404);
+    expect((await get(b.port, '/api/v1/nothing')).status).toBe(404);
+    expect((await get(b.port, '/api/health')).status).toBe(404); // the API is versioned: /api/v1/
     expect((await get(b.port, '/', `127.0.0.1:${b.port}`, 'POST')).status).toBe(405);
   });
 
   it('refuses requests addressed to any other host name (DNS rebinding)', async () => {
     const b = await board();
-    expect((await get(b.port, '/api/health', `localhost:${b.port}`)).status).toBe(200);
-    expect((await get(b.port, '/api/health', 'evil.example')).status).toBe(421);
-    expect((await get(b.port, '/api/health', `evil.example:${b.port}`)).status).toBe(421);
-    expect((await get(b.port, '/api/health', `127.0.0.1:${b.port + 1}`)).status).toBe(421);
+    expect((await get(b.port, '/api/v1/health', `localhost:${b.port}`)).status).toBe(200);
+    expect((await get(b.port, '/api/v1/health', 'evil.example')).status).toBe(421);
+    expect((await get(b.port, '/api/v1/health', `evil.example:${b.port}`)).status).toBe(421);
+    expect((await get(b.port, '/api/v1/health', `127.0.0.1:${b.port + 1}`)).status).toBe(421);
     expect(allowedHost(undefined, 80)).toBe(false);
     expect(allowedHost('localhost', 80)).toBe(true);
   });

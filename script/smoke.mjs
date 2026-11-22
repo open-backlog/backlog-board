@@ -1,7 +1,7 @@
 // After npm run build: the package as a user gets it. Checks it holds only the built server and
 // app, installs the packed tarball globally into a temporary prefix (with open-backlog from npm),
 // starts the installed open-backlog-board on a fixture backlog, and fetches the app, a bundle and
-// /api/health from it on 127.0.0.1.
+// /api/v1/health from it on 127.0.0.1.
 import { execFileSync, spawn } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -44,20 +44,20 @@ try {
   if (!page.includes('<ob-root>') || !js?.ok || !js.headers.get('content-type')?.startsWith('text/javascript')) fail(`the app: page ${page.slice(0, 80)}, script ${script} ${js?.status}`);
   else console.log(`smoke: it serves the built app (${script})`);
 
-  const health = await (await fetch(url + 'api/health')).json();
+  const health = await (await fetch(url + 'api/v1/health')).json();
   const core = JSON.parse(readFileSync(join(tmp, 'lib', 'node_modules', pkg.name, 'node_modules', 'open-backlog', 'package.json'), 'utf8')).version;
-  if (health.board !== pkg.version || health.core !== core || health.backlog?.name !== 'shop' || !(health.backlog?.items > 0)) fail(`/api/health gave ${JSON.stringify(health)}`);
-  else console.log(`smoke: /api/health reads the backlog through open-backlog ${core} (${health.backlog.name}, ${health.backlog.items} items)`);
+  if (health.board !== pkg.version || health.core !== core || health.backlog?.name !== 'shop' || !(health.backlog?.items > 0)) fail(`/api/v1/health gave ${JSON.stringify(health)}`);
+  else console.log(`smoke: /api/v1/health reads the backlog through open-backlog ${core} (${health.backlog.name}, ${health.backlog.items} items)`);
 
-  const columns = await (await fetch(url + 'api/board')).json();
+  const columns = await (await fetch(url + 'api/v1/board')).json();
   const cards = Object.values(columns.columns ?? {}).flat().length;
-  const listed = (await (await fetch(url + 'api/items?all=1')).json()).items.length;
-  if (!cards || cards !== listed) fail(`/api/board has ${cards} cards; /api/items has ${listed}`);
-  else console.log(`smoke: /api/board gives the columns (${Object.entries(columns.columns).map(([k, v]) => `${k} ${v.length}`).join(', ')})`);
-  const tree = await (await fetch(url + 'api/tree')).json();
-  const refused = await fetch(url + 'api/items/1.2.1/move', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"status":"doing"}' });
-  if (!Array.isArray(tree) || !tree.length || refused.status !== 403) fail(`/api/tree gave ${JSON.stringify(tree).slice(0, 80)}; a change without the board's Origin got ${refused.status}`);
-  else console.log(`smoke: /api/tree gives the plan (${tree.length} top items), and a change without the board's Origin is refused`);
+  const listed = (await (await fetch(url + 'api/v1/items?all=1')).json()).items.length;
+  if (!cards || cards !== listed) fail(`/api/v1/board has ${cards} cards; /api/v1/items has ${listed}`);
+  else console.log(`smoke: /api/v1/board gives the columns (${Object.entries(columns.columns).map(([k, v]) => `${k} ${v.length}`).join(', ')})`);
+  const tree = await (await fetch(url + 'api/v1/tree')).json();
+  const refused = await fetch(url + 'api/v1/items/1.2.1/move', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"status":"doing"}' });
+  if (!Array.isArray(tree) || !tree.length || refused.status !== 403) fail(`/api/v1/tree gave ${JSON.stringify(tree).slice(0, 80)}; a change without the board's Origin got ${refused.status}`);
+  else console.log(`smoke: /api/v1/tree gives the plan (${tree.length} top items), and a change without the board's Origin is refused`);
 } catch (e) {
   fail(e.message);
 } finally {

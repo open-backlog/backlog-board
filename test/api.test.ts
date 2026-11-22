@@ -77,33 +77,50 @@ const head = (root: string) => git(root, 'show', '--name-status', '--format=%s',
 const STORY = '1.2.1';
 
 describe('reading: the same answers as ob', () => {
+  it('tree (2.4.5): an empty feature is 0 of 0, epic 0 sits beside the plan, and the counts are ob tree --json', async () => {
+    const root = repo();
+    ob(root, 'new', 'feature', 'Gift cards', '--parent', '1');
+    ob(root, 'new', 'bug', 'Receipt is blank'); // into this month's feature of epic 0
+    const b = await board(root);
+    const tree = (await call(b, 'GET', '/api/v1/tree')).body as { id: string; progress: { total: number; percent: number } | null; children: { id: string; progress: unknown; children: { id: string; progress: unknown }[] }[] }[];
+    expect(tree).toEqual(JSON.parse(ob(root, 'tree', '--json')));
+    expect(tree.map(r => r.id)).toEqual(['C1', '0']);
+    const [planned, unplanned] = tree;
+    const features = planned?.children[0]?.children ?? [];
+    expect(features.map(f => f.id)).toEqual(['1.1', '1.2', '1.3']);
+    expect(features[2]?.progress).toMatchObject({ done: 0, doing: 0, todo: 0, total: 0, percent: 0 });
+    expect(unplanned?.children.map(f => f.id.startsWith('0.'))).not.toContain(false);
+    expect(unplanned?.progress).toMatchObject({ total: 2 });
+    expect(ob(root, 'tree')).toMatch(/1\.3 +todo +0\/0 done \(0%\) +Gift cards/);
+  });
+
   it('tree, show and validate equal ob tree, show and validate --json; list has ob list items in order', async () => {
     const root = repo();
     const b = await board(root);
-    expect((await call(b, 'GET', '/api/tree')).body).toEqual(JSON.parse(ob(root, 'tree', '--json')));
-    expect((await call(b, 'GET', '/api/tree?all=1')).body).toEqual(JSON.parse(ob(root, 'tree', '--json', '--all')));
-    const { description, ...shown } = (await call(b, 'GET', `/api/items/${STORY}`)).body as Record<string, unknown>;
+    expect((await call(b, 'GET', '/api/v1/tree')).body).toEqual(JSON.parse(ob(root, 'tree', '--json')));
+    expect((await call(b, 'GET', '/api/v1/tree?all=1')).body).toEqual(JSON.parse(ob(root, 'tree', '--json', '--all')));
+    const { description, ...shown } = (await call(b, 'GET', `/api/v1/items/${STORY}`)).body as Record<string, unknown>;
     expect(shown).toEqual(JSON.parse(ob(root, 'show', STORY, '--json')));
     expect(String(shown['text'])).toContain(String(description));
     const v = JSON.parse(execFileSync(OB, ['validate', '--json'], { cwd: root, encoding: 'utf8' })) as Record<string, unknown>;
-    expect((await call(b, 'GET', '/api/validate')).body).toEqual({ backlog: v['backlog'], valid: v['valid'], errors: v['errors'], warnings: v['warnings'], problems: v['problems'] });
+    expect((await call(b, 'GET', '/api/v1/validate')).body).toEqual({ backlog: v['backlog'], valid: v['valid'], errors: v['errors'], warnings: v['warnings'], problems: v['problems'] });
 
-    const listed = (await call(b, 'GET', '/api/items')).body as { items: { id: string; status: string; fields: Record<string, unknown> }[] };
+    const listed = (await call(b, 'GET', '/api/v1/items')).body as { items: { id: string; status: string; fields: Record<string, unknown> }[] };
     const obList = JSON.parse(ob(root, 'list', '--json')) as { id: string; status: string }[];
     expect(listed.items.map(i => `${i.id} ${i.status}`)).toEqual(obList.map(i => `${i.id} ${i.status}`));
-    const filtered = (await call(b, 'GET', '/api/items?status=todo,doing&repo=shop-api')).body as { items: { id: string }[] };
+    const filtered = (await call(b, 'GET', '/api/v1/items?status=todo,doing&repo=shop-api')).body as { items: { id: string }[] };
     expect(filtered.items.map(i => i.id)).toEqual((JSON.parse(ob(root, 'list', '--json', '--status', 'todo,doing', '--repo', 'shop-api')) as { id: string }[]).map(i => i.id));
     expect(listed.items[0]?.fields['id']).toBeDefined();
   });
 
   it('404 for an unknown item, 405 for a method a path does not take', async () => {
     const b = await board(repo());
-    expect(await call(b, 'GET', '/api/items/9.9.9')).toEqual({ status: 404, body: { error: 'no item 9.9.9 in this backlog' } });
-    expect((await call(b, 'DELETE', `/api/items/${STORY}`, {})).status).toBe(405);
-    expect((await call(b, 'GET', '/api/nope')).status).toBe(404);
+    expect(await call(b, 'GET', '/api/v1/items/9.9.9')).toEqual({ status: 404, body: { error: 'no item 9.9.9 in this backlog' } });
+    expect((await call(b, 'DELETE', `/api/v1/items/${STORY}`, {})).status).toBe(405);
+    expect((await call(b, 'GET', '/api/v1/nope')).status).toBe(404);
     // A refused change, then a read on the same connection.
-    expect((await call(b, 'POST', `/api/items/${STORY}/move`, { status: 'x' }, { origin: 'https://evil.example' })).status).toBe(403);
-    expect((await call(b, 'GET', '/api/health')).status).toBe(200);
+    expect((await call(b, 'POST', `/api/v1/items/${STORY}/move`, { status: 'x' }, { origin: 'https://evil.example' })).status).toBe(403);
+    expect((await call(b, 'GET', '/api/v1/health')).status).toBe(200);
   });
 });
 
@@ -112,7 +129,7 @@ describe('changes: one commit each, the same as ob, and only the files it touche
     const root = repo();
     const other = twin(root);
     const b = await board(root);
-    const r = await call(b, 'POST', `/api/items/${STORY}/move`, { status: 'doing' });
+    const r = await call(b, 'POST', `/api/v1/items/${STORY}/move`, { status: 'doing' });
     expect(r.status).toBe(200);
     ob(other, 'move', STORY, 'doing');
     expect(head(root)).toEqual(head(other));
@@ -125,14 +142,14 @@ describe('changes: one commit each, the same as ob, and only the files it touche
     const root = repo();
     const other = twin(root);
     const b = await board(root);
-    const r = await call(b, 'POST', '/api/items', { type: 'story', title: 'Gift cards', parent: '1.1' });
+    const r = await call(b, 'POST', '/api/v1/items', { type: 'story', title: 'Gift cards', parent: '1.1' });
     expect(r.status).toBe(201);
     ob(other, 'new', 'story', 'Gift cards', '--parent', '1.1');
     expect(head(root)).toEqual(head(other));
     const path = (r.body as { path: string }).path;
     expect(readFileSync(join(root, 'backlog', path), 'utf8')).toBe(readFileSync(join(other, 'backlog', path), 'utf8'));
 
-    expect((await call(b, 'POST', `/api/items/${STORY}/comments`, { text: 'Looks good' })).status).toBe(201);
+    expect((await call(b, 'POST', `/api/v1/items/${STORY}/comments`, { text: 'Looks good' })).status).toBe(201);
     ob(other, 'comment', STORY, 'Looks good');
     expect(head(root)).toEqual(head(other));
     expect(git(root, 'diff', 'HEAD~1', 'HEAD')).toBe(git(other, 'diff', 'HEAD~1', 'HEAD'));
@@ -141,26 +158,26 @@ describe('changes: one commit each, the same as ob, and only the files it touche
   it('update changes only those fields, in one commit; unknown fields stay; null removes one', async () => {
     const root = repo();
     const b = await board(root);
-    const file = (await call(b, 'GET', `/api/items/${STORY}`)).body as { path: string };
+    const file = (await call(b, 'GET', `/api/v1/items/${STORY}`)).body as { path: string };
     const abs = join(root, 'backlog', file.path);
     writeFileSync(abs, readFileSync(abs, 'utf8').replace('---\n\n', 'customer: acme\n---\n\n'));
     git(root, 'commit', '-qam', 'a field of our own');
-    const r = await call(b, 'PATCH', `/api/items/${STORY}`, { fields: { assignee: 'jo-smith', estimate: 3 } });
+    const r = await call(b, 'PATCH', `/api/v1/items/${STORY}`, { fields: { assignee: 'jo-smith', estimate: 3 } });
     expect(r).toEqual({ status: 200, body: { path: file.path, changed: true, committed: true } });
     expect(head(root)).toEqual([`ob: edit ${STORY} assignee, estimate`, `M\tbacklog/${file.path}`]);
     const diff = git(root, 'diff', '-U0', 'HEAD~1', 'HEAD').split('\n').filter(l => /^[+-](?![+-]{2})/.test(l));
     expect(diff.every(l => /^[+-](assignee|estimate):/.test(l))).toBe(true);
     expect(readFileSync(abs, 'utf8')).toContain('customer: acme');
-    await call(b, 'PATCH', `/api/items/${STORY}`, { fields: { assignee: null } });
+    await call(b, 'PATCH', `/api/v1/items/${STORY}`, { fields: { assignee: null } });
     expect(readFileSync(abs, 'utf8')).not.toContain('assignee:');
-    expect((await call(b, 'PATCH', `/api/items/${STORY}`, { fields: { estimate: 3 } })).body).toEqual({ path: file.path, changed: false, committed: false });
+    expect((await call(b, 'PATCH', `/api/v1/items/${STORY}`, { fields: { estimate: 3 } })).body).toEqual({ path: file.path, changed: false, committed: false });
   });
 
   it("refuses an update ob validate would report, with its message, and puts the file back", async () => {
     const root = repo();
     const b = await board(root);
     const before = git(root, 'rev-parse', 'HEAD');
-    const r = await call(b, 'PATCH', `/api/items/${STORY}`, { fields: { parent: '9.9' } });
+    const r = await call(b, 'PATCH', `/api/v1/items/${STORY}`, { fields: { parent: '9.9' } });
     expect(r.status).toBe(400);
     expect((r.body as { error: string }).error).toMatch(/^OB002 \[parent-exists\] .+ Fix: /);
     expect(git(root, 'status', '--porcelain')).toBe('');
@@ -173,11 +190,11 @@ describe('changes: one commit each, the same as ob, and only the files it touche
     writeFileSync(join(root, 'notes.txt'), 'mine\n');
     appendFileSync(join(root, 'backlog', 'config.yml'), '# mine\n');
     git(root, 'add', 'backlog/config.yml');
-    const epic = (await call(b, 'GET', '/api/items/1')).body as { path: string };
+    const epic = (await call(b, 'GET', '/api/v1/items/1')).body as { path: string };
     appendFileSync(join(root, 'backlog', epic.path), '\nMy draft.\n');
     const mine = git(root, 'status', '--porcelain');
-    await call(b, 'POST', `/api/items/${STORY}/move`, { status: 'doing' });
-    await call(b, 'PATCH', `/api/items/${STORY}`, { fields: { assignee: 'ana' } });
+    await call(b, 'POST', `/api/v1/items/${STORY}/move`, { status: 'doing' });
+    await call(b, 'PATCH', `/api/v1/items/${STORY}`, { fields: { assignee: 'ana' } });
     expect(git(root, 'show', '--name-only', '--format=', 'HEAD~1', 'HEAD').split('\n').filter(Boolean).every(f => f.includes(`${STORY}-`))).toBe(true);
     expect(git(root, 'status', '--porcelain')).toBe(mine);
   });
@@ -185,19 +202,19 @@ describe('changes: one commit each, the same as ob, and only the files it touche
   it("refuses to change an item whose file has your uncommitted changes", async () => {
     const root = repo();
     const b = await board(root);
-    const story = (await call(b, 'GET', `/api/items/${STORY}`)).body as { path: string };
+    const story = (await call(b, 'GET', `/api/v1/items/${STORY}`)).body as { path: string };
     appendFileSync(join(root, 'backlog', story.path), '\nMy draft.\n');
-    const r = await call(b, 'POST', `/api/items/${STORY}/move`, { status: 'done' });
+    const r = await call(b, 'POST', `/api/v1/items/${STORY}/move`, { status: 'done' });
     expect(r.status).toBe(409);
     expect((r.body as { error: string }).error).toContain("has changes that aren't committed");
-    expect((await call(b, 'PATCH', `/api/items/${STORY}`, { fields: { rank: 1 } })).status).toBe(409);
+    expect((await call(b, 'PATCH', `/api/v1/items/${STORY}`, { fields: { rank: 1 } })).status).toBe(409);
     expect(git(root, 'log', '--format=%s', '-1')).toBe('start');
   });
 
   it('with commit off (ob serve --no-commit), changes are made and left to you', async () => {
     const root = repo();
     const b = await board(root, false);
-    expect((await call(b, 'POST', `/api/items/${STORY}/move`, { status: 'doing' })).body).toMatchObject({ committed: false });
+    expect((await call(b, 'POST', `/api/v1/items/${STORY}/move`, { status: 'doing' })).body).toMatchObject({ committed: false });
     expect(git(root, 'log', '--format=%s', '-1')).toBe('start');
     expect(git(root, 'status', '--porcelain')).toMatch(/^R {2}backlog\/stories\/todo\/.+ -> backlog\/stories\/doing\//);
   });
@@ -205,20 +222,20 @@ describe('changes: one commit each, the same as ob, and only the files it touche
   it('runs changes one at a time: two at once both commit', async () => {
     const root = repo();
     const b = await board(root);
-    const todo = (await call(b, 'GET', '/api/items?status=todo')).body as { items: { id: string }[] };
+    const todo = (await call(b, 'GET', '/api/v1/items?status=todo')).body as { items: { id: string }[] };
     const [x, y] = todo.items.map(i => i.id);
-    const rs = await Promise.all([call(b, 'POST', `/api/items/${x}/move`, { status: 'doing' }), call(b, 'POST', `/api/items/${y}/move`, { status: 'doing' })]);
+    const rs = await Promise.all([call(b, 'POST', `/api/v1/items/${x}/move`, { status: 'doing' }), call(b, 'POST', `/api/v1/items/${y}/move`, { status: 'doing' })]);
     expect(rs.map(r => r.status)).toEqual([200, 200]);
     expect(git(root, 'log', '--format=%s', '-2').split('\n').sort()).toEqual([`ob: move ${x} to doing`, `ob: move ${y} to doing`].sort());
   });
 
   it('bad requests: a status, a body, the type', async () => {
     const b = await board(repo());
-    expect((await call(b, 'POST', `/api/items/${STORY}/move`, { status: 'later' })).status).toBe(400);
-    expect((await call(b, 'POST', '/api/items/1/move', { status: 'done' })).body).toEqual({ error: "1 is an epic, which doesn't move: its status comes from its items" });
-    expect((await call(b, 'POST', '/api/items', { type: 'story', title: 'X', parent: '9.9' })).status).toBe(400);
-    expect((await call(b, 'PATCH', `/api/items/${STORY}`, { fields: { x: { y: 1 } } })).status).toBe(400);
-    expect((await call(b, 'PATCH', `/api/items/${STORY}`, [1])).status).toBe(400);
+    expect((await call(b, 'POST', `/api/v1/items/${STORY}/move`, { status: 'later' })).status).toBe(400);
+    expect((await call(b, 'POST', '/api/v1/items/1/move', { status: 'done' })).body).toEqual({ error: "1 is an epic, which doesn't move: its status comes from its items" });
+    expect((await call(b, 'POST', '/api/v1/items', { type: 'story', title: 'X', parent: '9.9' })).status).toBe(400);
+    expect((await call(b, 'PATCH', `/api/v1/items/${STORY}`, { fields: { x: { y: 1 } } })).status).toBe(400);
+    expect((await call(b, 'PATCH', `/api/v1/items/${STORY}`, [1])).status).toBe(400);
   });
 });
 
@@ -226,7 +243,7 @@ describe('only the board itself may change things', () => {
   it('refuses changes from another origin, with no origin, or not as JSON; reading needs neither', async () => {
     const root = repo();
     const b = await board(root);
-    const move = (headers: Record<string, string>) => call(b, 'POST', `/api/items/${STORY}/move`, { status: 'doing' }, headers);
+    const move = (headers: Record<string, string>) => call(b, 'POST', `/api/v1/items/${STORY}/move`, { status: 'doing' }, headers);
     expect((await move({ origin: 'https://evil.example' })).status).toBe(403);
     expect((await move({ origin: `http://127.0.0.1:${b.port + 1}` })).status).toBe(403);
     expect((await move({ origin: '' })).status).toBe(403);
@@ -234,15 +251,15 @@ describe('only the board itself may change things', () => {
     expect((await move({ 'content-type': 'application/x-www-form-urlencoded' })).status).toBe(415);
     expect(git(root, 'log', '--format=%s', '-1')).toBe('start');
     expect((await move({ origin: `http://localhost:${b.port}` })).status).toBe(200);
-    expect((await call(b, 'GET', '/api/tree', undefined, { origin: 'https://evil.example' })).status).toBe(200);
+    expect((await call(b, 'GET', '/api/v1/tree', undefined, { origin: 'https://evil.example' })).status).toBe(200);
   });
 });
 
-describe('/api/events', () => {
+describe('/api/v1/events', () => {
   /** Opens the stream; resolves each change event's paths and when it came. */
   function listen(b: Board) {
     const got: { at: number; paths: string[] }[] = [];
-    const req = request({ host: HOST, port: b.port, path: '/api/events', headers: { host: `127.0.0.1:${b.port}` } }, res => {
+    const req = request({ host: HOST, port: b.port, path: '/api/v1/events', headers: { host: `127.0.0.1:${b.port}` } }, res => {
       let buf = '';
       res.on('data', d => {
         buf += d;
@@ -267,7 +284,7 @@ describe('/api/events', () => {
     const b = await board(root);
     const s = listen(b);
     await new Promise(r => setTimeout(r, 200));
-    const story = (await call(b, 'GET', `/api/items/${STORY}`)).body as { path: string };
+    const story = (await call(b, 'GET', `/api/v1/items/${STORY}`)).body as { path: string };
     const saved = Date.now();
     appendFileSync(join(root, 'backlog', story.path), '\nEdited in an editor.\n');
     await s.until(() => s.got.length > 0);
@@ -276,7 +293,7 @@ describe('/api/events', () => {
     git(root, 'checkout', '--', '.');
     await new Promise(r => setTimeout(r, 200));
     s.got.length = 0;
-    await call(b, 'POST', `/api/items/${STORY}/move`, { status: 'doing' });
+    await call(b, 'POST', `/api/v1/items/${STORY}/move`, { status: 'doing' });
     await s.until(() => s.got.some(g => g.paths.some(p => p.startsWith('stories/doing/'))));
     expect(s.got.flatMap(g => g.paths).some(p => p.startsWith('stories/doing/'))).toBe(true);
     s.stop();
@@ -289,7 +306,7 @@ describe('the board: columns, filters and reordering (2.4.3)', () => {
   it('three columns, each in column order (rank first, then ID), with what a card shows', async () => {
     const root = repo();
     const b = await board(root);
-    const o = (await call(b, 'GET', '/api/board')).body as BoardOut;
+    const o = (await call(b, 'GET', '/api/v1/board')).body as BoardOut;
     const obList = JSON.parse(ob(root, 'list', '--json')) as { id: string; status: string }[];
     for (const st of ['todo', 'doing', 'done'] as const) {
       expect([...o.columns[st].map(c => c.id)].sort()).toEqual(obList.filter(i => i.status === st).map(i => i.id).sort());
@@ -310,7 +327,7 @@ describe('the board: columns, filters and reordering (2.4.3)', () => {
   it('filters as ob list does: under an epic or feature, by repo and by type', async () => {
     const root = repo();
     const b = await board(root);
-    const flat = async (q: string) => Object.values(((await call(b, 'GET', `/api/board?${q}`)).body as BoardOut).columns).flat().map(c => c.id).sort();
+    const flat = async (q: string) => Object.values(((await call(b, 'GET', `/api/v1/board?${q}`)).body as BoardOut).columns).flat().map(c => c.id).sort();
     const obIds = (...args: string[]) => (JSON.parse(ob(root, 'list', '--json', ...args)) as { id: string }[]).map(i => i.id).sort();
     expect(await flat('parent=1.2')).toEqual(obIds('--parent', '1.2'));
     expect(await flat('parent=1')).toEqual(obIds('--parent', '1'));
@@ -327,8 +344,8 @@ describe('the board: columns, filters and reordering (2.4.3)', () => {
     // Done long ago: the move to done is the commit that dates it.
     const env = { ...process.env, GIT_AUTHOR_DATE: old, GIT_COMMITTER_DATE: old };
     execFileSync(OB, ['done', '1.2.2'], { cwd: root, env });
-    const recent = (await call(b, 'GET', '/api/board')).body as BoardOut;
-    const all = (await call(b, 'GET', '/api/board?all=1')).body as BoardOut;
+    const recent = (await call(b, 'GET', '/api/v1/board')).body as BoardOut;
+    const all = (await call(b, 'GET', '/api/v1/board?all=1')).body as BoardOut;
     expect(recent.columns.done.map(c => c.id)).not.toContain('1.2.2');
     expect(recent.hiddenDone).toBe(1);
     expect(all.columns.done.map(c => c.id)).toContain('1.2.2');
@@ -338,18 +355,18 @@ describe('the board: columns, filters and reordering (2.4.3)', () => {
   it("reordering changes only the moved card's rank, in one commit, and puts it there", async () => {
     const root = repo();
     const b = await board(root);
-    const before = ids((await call(b, 'GET', '/api/board')).body as BoardOut)['todo'] ?? [];
+    const before = ids((await call(b, 'GET', '/api/v1/board')).body as BoardOut)['todo'] ?? [];
     expect(before.length).toBeGreaterThanOrEqual(3);
     const last = before[before.length - 1] ?? '';
-    const r = await call(b, 'POST', `/api/items/${last}/rank`, { after: null });
+    const r = await call(b, 'POST', `/api/v1/items/${last}/rank`, { after: null });
     expect(r.status).toBe(200);
     expect(head(root)[0]).toBe(`ob: edit ${last} rank`);
     expect(head(root)).toHaveLength(2);
     const diff = git(root, 'diff', '-U0', 'HEAD~1', 'HEAD').split('\n').filter(l => /^[+-](?![+-]{2})/.test(l));
     expect(diff.every(l => /^[+-]rank: /.test(l))).toBe(true);
-    expect(ids((await call(b, 'GET', '/api/board')).body as BoardOut)['todo']?.[0]).toBe(last);
-    expect((await call(b, 'POST', `/api/items/${last}/rank`, { after: 'nope' })).status).toBe(400);
-    expect((await call(b, 'POST', '/api/items/1/rank', { after: null })).status).toBe(400);
+    expect(ids((await call(b, 'GET', '/api/v1/board')).body as BoardOut)['todo']?.[0]).toBe(last);
+    expect((await call(b, 'POST', `/api/v1/items/${last}/rank`, { after: 'nope' })).status).toBe(400);
+    expect((await call(b, 'POST', '/api/v1/items/1/rank', { after: null })).status).toBe(400);
   });
 
   it('rankFor: halfway between ranked cards, after the last ranked, at the top, and never among unranked ones', () => {
@@ -369,31 +386,31 @@ describe('the item editor (2.4.4)', () => {
   it('edits the description in one commit: front matter byte for byte, comments kept', async () => {
     const root = repo();
     const b = await board(root);
-    await call(b, 'POST', `/api/items/${STORY}/comments`, { text: 'First thoughts' });
-    const item = (await call(b, 'GET', `/api/items/${STORY}`)).body as { path: string; text: string; description: string };
+    await call(b, 'POST', `/api/v1/items/${STORY}/comments`, { text: 'First thoughts' });
+    const item = (await call(b, 'GET', `/api/v1/items/${STORY}`)).body as { path: string; text: string; description: string };
     const abs = join(root, 'backlog', item.path);
     const front = item.text.slice(0, item.text.indexOf('---', 3) + 4);
-    const r = await call(b, 'PATCH', `/api/items/${STORY}`, { description: 'A new description.\n\n- with a list\n' });
+    const r = await call(b, 'PATCH', `/api/v1/items/${STORY}`, { description: 'A new description.\n\n- with a list\n' });
     expect(r).toEqual({ status: 200, body: { path: item.path, changed: true, committed: true } });
     expect(head(root)).toEqual([`ob: edit ${STORY} description`, `M\tbacklog/${item.path}`]);
     const after = readFileSync(abs, 'utf8');
     expect(after.startsWith(front)).toBe(true);
     expect(after).toContain('\nA new description.\n\n- with a list\n\n## Comments\n- ');
     expect(after).toContain('@ana: First thoughts');
-    const shown = (await call(b, 'GET', `/api/items/${STORY}`)).body as { description: string; comments: unknown[] };
+    const shown = (await call(b, 'GET', `/api/v1/items/${STORY}`)).body as { description: string; comments: unknown[] };
     expect(shown.description).toBe('\nA new description.\n\n- with a list\n\n');
     expect(shown.comments).toHaveLength(1);
-    expect((await call(b, 'PATCH', `/api/items/${STORY}`, { description: shown.description })).body).toEqual({ path: item.path, changed: false, committed: false });
+    expect((await call(b, 'PATCH', `/api/v1/items/${STORY}`, { description: shown.description })).body).toEqual({ path: item.path, changed: false, committed: false });
   });
 
   it('fields and description together are one commit; a custom field survives', async () => {
     const root = repo();
     const b = await board(root);
-    const item = (await call(b, 'GET', `/api/items/${STORY}`)).body as { path: string };
+    const item = (await call(b, 'GET', `/api/v1/items/${STORY}`)).body as { path: string };
     const abs = join(root, 'backlog', item.path);
     writeFileSync(abs, readFileSync(abs, 'utf8').replace(/\n---\n/, '\ncustomer: acme\n---\n'));
     git(root, 'commit', '-qam', 'custom field');
-    await call(b, 'PATCH', `/api/items/${STORY}`, { fields: { assignee: 'raj', title: 'Card form, renamed' }, description: 'Rewritten.' });
+    await call(b, 'PATCH', `/api/v1/items/${STORY}`, { fields: { assignee: 'raj', title: 'Card form, renamed' }, description: 'Rewritten.' });
     expect(head(root)[0]).toBe(`ob: edit ${STORY} assignee, title, description`);
     const text = readFileSync(abs, 'utf8');
     expect(text).toContain('customer: acme');
@@ -406,11 +423,11 @@ describe('the item editor (2.4.4)', () => {
   it('refuses a change ob validate would report, and leaves the description as it was', async () => {
     const root = repo();
     const b = await board(root);
-    const r = await call(b, 'PATCH', `/api/items/${STORY}`, { fields: { parent: '' }, description: 'Changed' });
+    const r = await call(b, 'PATCH', `/api/v1/items/${STORY}`, { fields: { parent: '' }, description: 'Changed' });
     expect(r.status).toBe(400);
     expect(git(root, 'status', '--porcelain')).toBe('');
-    expect((await call(b, 'PATCH', `/api/items/${STORY}`, {})).status).toBe(400);
-    expect((await call(b, 'PATCH', `/api/items/${STORY}`, { description: 3 })).status).toBe(400);
+    expect((await call(b, 'PATCH', `/api/v1/items/${STORY}`, {})).status).toBe(400);
+    expect((await call(b, 'PATCH', `/api/v1/items/${STORY}`, { description: 3 })).status).toBe(400);
   });
 
   it('creates a story, bug, feature and epic as ob new does; a bug with no parent goes to epic 0', async () => {
@@ -418,12 +435,12 @@ describe('the item editor (2.4.4)', () => {
     const other = twin(root);
     const b = await board(root);
     for (const [type, title, parent] of [['story', 'Wish list', '1.2'], ['bug', 'Totals off', null], ['feature', 'Returns', '1'], ['epic', 'Loyalty', null]] as const) {
-      const r = await call(b, 'POST', '/api/items', { type, title, ...(parent ? { parent } : {}) });
+      const r = await call(b, 'POST', '/api/v1/items', { type, title, ...(parent ? { parent } : {}) });
       expect(r.status, `${type} ${JSON.stringify(r.body)}`).toBe(201);
       ob(other, 'new', type, title, ...(parent ? ['--parent', parent] : []));
       expect(head(root)).toEqual(head(other));
     }
-    const missing = await call(b, 'POST', '/api/items', { type: 'story', title: 'Orphan' });
+    const missing = await call(b, 'POST', '/api/v1/items', { type: 'story', title: 'Orphan' });
     expect(missing.status).toBe(400);
     expect((missing.body as { error: string }).error).toContain('needs --parent');
   });

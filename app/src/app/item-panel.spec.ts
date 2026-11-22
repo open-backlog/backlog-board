@@ -53,7 +53,7 @@ describe('the item panel', () => {
     panel.rows().at(-1)!.text = '0.3.0';
     await panel.saveFields();
     await settle();
-    expect(posts(server)).toEqual([{ method: 'PATCH', url: 'api/items/1.1.2', body: { fields: { estimate: 5, repo: ['shop-web'], customer: null, release: '0.3.0' } } }]);
+    expect(posts(server)).toEqual([{ method: 'PATCH', url: 'api/v1/items/1.1.2', body: { fields: { estimate: 5, repo: ['shop-web'], customer: null, release: '0.3.0' } } }]);
     expect(panel.editFields()).toBe(false);
   });
 
@@ -63,14 +63,14 @@ describe('the item panel', () => {
     expect(panel.draft()).toBe('**As a** shopper, **I want to:**\n- pay by card');
     panel.draft.set('New text');
     await panel.saveDesc();
-    expect(posts(server)).toEqual([{ method: 'PATCH', url: 'api/items/1.1.2', body: { description: 'New text' } }]);
+    expect(posts(server)).toEqual([{ method: 'PATCH', url: 'api/v1/items/1.1.2', body: { description: 'New text' } }]);
   });
 
   it('adds a comment, the line ob comment writes, on the server', async () => {
     const { server, panel } = await render();
     panel.newComment.set('Looks good');
     await panel.comment();
-    expect(posts(server)).toEqual([{ method: 'POST', url: 'api/items/1.1.2/comments', body: { text: 'Looks good' } }]);
+    expect(posts(server)).toEqual([{ method: 'POST', url: 'api/v1/items/1.1.2/comments', body: { text: 'Looks good' } }]);
     expect(panel.newComment()).toBe('');
   });
 

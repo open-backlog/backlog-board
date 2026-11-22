@@ -13,20 +13,20 @@ import type { Backlog, FieldValue, Item, ListFilters, Node, Progress, Status } f
  * The board's JSON API (2.4.2): HTTP in front of open-backlog, the same functions the ob command
  * calls, so the board and the CLI can't disagree (D1). Every change is one commit of only the
  * files it touched (D3), and a file with changes you haven't committed is never swept into one.
- * Changes run one at a time. /api/events tells the browser when anything in the backlog folder
+ * Changes run one at a time. /api/v1/events tells the browser when anything in the backlog folder
  * changes, from the board or from an editor.
  *
- *   GET    /api/items?status=&type=&parent=&repo=&assignee=&sprint=&all=1   as ob list --json
- *   GET    /api/items/:id                                                    as ob show --json
- *   GET    /api/board?parent=&repo=&type=&all=1                              the columns, in column order
- *   GET    /api/tree?all=1                                                   as ob tree --json
- *   GET    /api/validate                                                     as ob validate --json
- *   GET    /api/events                                                       server-sent events
- *   POST   /api/items                 { type, title, parent?, slug? }        as ob new
- *   POST   /api/items/:id/move        { status }                             as ob move
- *   PATCH  /api/items/:id             { fields?: { name: value | null }, description? }   an edit, one commit
- *   POST   /api/items/:id/comments    { text, handle? }                      as ob comment
- *   POST   /api/items/:id/rank        { after: id | null }                   reorder in its column (its rank only)
+ *   GET    /api/v1/items?status=&type=&parent=&repo=&assignee=&sprint=&all=1   as ob list --json
+ *   GET    /api/v1/items/:id                                                    as ob show --json
+ *   GET    /api/v1/board?parent=&repo=&type=&all=1                              the columns, in column order
+ *   GET    /api/v1/tree?all=1                                                   as ob tree --json
+ *   GET    /api/v1/validate                                                     as ob validate --json
+ *   GET    /api/v1/events                                                       server-sent events
+ *   POST   /api/v1/items                 { type, title, parent?, slug? }        as ob new
+ *   POST   /api/v1/items/:id/move        { status }                             as ob move
+ *   PATCH  /api/v1/items/:id             { fields?: { name: value | null }, description? }   an edit, one commit
+ *   POST   /api/v1/items/:id/comments    { text, handle? }                      as ob comment
+ *   POST   /api/v1/items/:id/rank        { after: id | null }                   reorder in its column (its rank only)
  */
 
 const STATUSES: readonly Status[] = ['todo', 'doing', 'done'];
@@ -330,15 +330,15 @@ function text(body: Record<string, unknown>, key: string): string {
 const readText = (p: string) => readFileSync(p, 'utf8');
 const writeText = (p: string, t: string) => writeFileSync(p, t);
 
-/** Routes /api/… requests to the API; returns false for anything else. */
+/** Routes /api/v1/… requests to the API; returns false for anything else. */
 export async function route(api: Api, req: IncomingMessage, path: string, raw: Buffer, send: (status: number, body: unknown) => void): Promise<boolean> {
-  const m = /^\/api\/items(?:\/([^/]+))?(?:\/(move|comments|rank))?$/.exec(path);
+  const m = /^\/api\/v1\/items(?:\/([^/]+))?(?:\/(move|comments|rank))?$/.exec(path);
   const q = new URL(req.url ?? '/', 'http://x').searchParams;
   const method = req.method ?? 'GET';
   try {
-    if (path === '/api/board' && method === 'GET') send(200, api.board(q));
-    else if (path === '/api/tree' && method === 'GET') send(200, api.tree(q));
-    else if (path === '/api/validate' && method === 'GET') send(200, api.validation());
+    if (path === '/api/v1/board' && method === 'GET') send(200, api.board(q));
+    else if (path === '/api/v1/tree' && method === 'GET') send(200, api.tree(q));
+    else if (path === '/api/v1/validate' && method === 'GET') send(200, api.validation());
     else if (m && !m[1] && method === 'GET') send(200, api.list(q));
     else if (m && !m[1] && method === 'POST') send(201, await api.create(json(raw)));
     else if (m?.[1] && !m[2] && method === 'GET') send(200, api.show(decodeURIComponent(m[1])));
@@ -346,7 +346,7 @@ export async function route(api: Api, req: IncomingMessage, path: string, raw: B
     else if (m?.[1] && m[2] === 'move' && method === 'POST') send(200, await api.move(decodeURIComponent(m[1]), json(raw)));
     else if (m?.[1] && m[2] === 'rank' && method === 'POST') send(200, await api.rank(decodeURIComponent(m[1]), json(raw)));
     else if (m?.[1] && m[2] === 'comments' && method === 'POST') send(201, await api.comment(decodeURIComponent(m[1]), json(raw)));
-    else if (m || path === '/api/board' || path === '/api/tree' || path === '/api/validate') send(405, { error: `${method} is not allowed on ${path}` });
+    else if (m || path === '/api/v1/board' || path === '/api/v1/tree' || path === '/api/v1/validate') send(405, { error: `${method} is not allowed on ${path}` });
     else return false;
   } catch (e) {
     if (e instanceof ApiError) send(e.status, { error: e.message });

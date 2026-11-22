@@ -1,6 +1,6 @@
 import { CdkDrag, CdkDragPlaceholder, CdkDropList, CdkDropListGroup, moveItemInArray, transferArrayItem } from '@angular/cdk/drag-drop';
 import type { CdkDragDrop } from '@angular/cdk/drag-drop';
-import { Component, computed, effect, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, linkedSignal, signal } from '@angular/core';
 
 import { loadBoard, moveCard, NO_FILTERS, rankCard, STATUSES } from './board-api';
 import type { BoardData, Card, Filters, Status } from './board-api';
@@ -10,7 +10,8 @@ import { NewItem } from './new-item';
 
 /**
  * The board (2.4.3): todo, doing and done columns of cards, in column order (rank, then ID).
- * A card's title opens it in the item panel, and + New makes an item (2.4.4).
+ * A card's title opens it in the item panel, and + New makes an item (2.4.4). The tree opens it
+ * filtered to a feature or an epic (2.4.5).
  * Dragging a card to another column moves it (ob move); dragging it within its column changes
  * its rank alone; the ← → buttons move it without a mouse. Every change is the server's, one
  * commit each, and the columns are read again after it, and whenever the backlog changes.
@@ -24,27 +25,27 @@ import { NewItem } from './new-item';
       <label>Epic
         <select [value]="filters().epic" (change)="set({ epic: value($event), feature: '' })">
           <option value="">All</option>
-          @for (e of data()?.options?.epics ?? []; track e.id) { <option [value]="e.id">{{ e.id }} {{ e.title }}</option> }
+          @for (e of data()?.options?.epics ?? []; track e.id) { <option [value]="e.id" [selected]="e.id === filters().epic">{{ e.id }} {{ e.title }}</option> }
         </select>
       </label>
       <label>Feature
         <select [value]="filters().feature" (change)="set({ feature: value($event) })">
           <option value="">All</option>
-          @for (f of features(); track f.id) { <option [value]="f.id">{{ f.id }} {{ f.title }}</option> }
+          @for (f of features(); track f.id) { <option [value]="f.id" [selected]="f.id === filters().feature">{{ f.id }} {{ f.title }}</option> }
         </select>
       </label>
       @if (data()?.options?.repos?.length) {
         <label>Repo
           <select [value]="filters().repo" (change)="set({ repo: value($event) })">
             <option value="">All</option>
-            @for (r of data()!.options.repos; track r) { <option [value]="r">{{ r }}</option> }
+            @for (r of data()!.options.repos; track r) { <option [value]="r" [selected]="r === filters().repo">{{ r }}</option> }
           </select>
         </label>
       }
       <label>Type
         <select [value]="filters().type" (change)="set({ type: value($event) })">
           <option value="">All</option>
-          @for (t of data()?.options?.types ?? []; track t) { <option [value]="t">{{ t }}</option> }
+          @for (t of data()?.options?.types ?? []; track t) { <option [value]="t" [selected]="t === filters().type">{{ t }}</option> }
         </select>
       </label>
       <label class="check"><input type="checkbox" [checked]="filters().all" (change)="set({ all: checked($event) })"> All done items</label>
@@ -99,7 +100,9 @@ export class Board {
   readonly open = signal<string | null>(null);
   readonly creating = signal(false);
   readonly statuses = STATUSES;
-  readonly filters = signal<Filters>(NO_FILTERS);
+  /** Where the board starts: the tree opens it on a feature or an epic (2.4.5). */
+  readonly initial = input<Filters>(NO_FILTERS);
+  readonly filters = linkedSignal<Filters>(() => this.initial());
   readonly data = signal<BoardData | null>(null);
   readonly error = signal<string | null>(null);
   /** The columns as shown; a drag changes them at once, and the server's answer replaces them. */

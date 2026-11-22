@@ -1,0 +1,35 @@
+:host { display: block; padding: 1rem 1.25rem 2rem; }
+.error { border-left: 3px solid var(--ob-brand); padding: 0.25rem 0.75rem; }
+.plan { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 1rem; align-items: start; }
+@media (max-width: 900px) { .plan { grid-template-columns: minmax(0, 1fr); } }
+section { container-type: inline-size; background: var(--ob-subtle); border: 1px solid var(--ob-border); border-radius: 10px; padding: 0.75rem 1rem 1rem; }
+.unplanned { border-top: 3px solid var(--ob-brand); }
+.planned { border-top: 3px solid var(--ob-done); }
+.head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; margin-bottom: 0.75rem; }
+h2 { font-size: 1rem; font-weight: var(--ob-weight-bold); margin: 0; }
+h2 .id { margin-left: 0.5rem; font-family: var(--ob-font-mono); font-size: 0.75rem; color: var(--ob-muted); font-weight: normal; }
+.whole { flex: 1; min-width: 12rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.625rem; }
+.whole .meter { height: 10px; }
+
+ul { list-style: none; margin: 0; padding: 0; }
+.tree ul { margin-left: 1.25rem; border-left: 1px solid var(--ob-border); padding-left: 0.75rem; }
+.row { display: grid; grid-template-columns: 2.75rem minmax(0, 1fr) 8rem 12.5rem; align-items: center; gap: 0.625rem; padding: 0.25rem 0; }
+.id { font-family: var(--ob-font-mono); font-size: 0.75rem; font-weight: var(--ob-weight-bold); }
+.name, .open { font-size: 0.9375rem; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.t-capability > .row .name, .t-epic > .row .open { font-weight: var(--ob-weight-bold); }
+.open { background: none; border: none; padding: 0; text-align: left; color: inherit; font: inherit; cursor: pointer; }
+.open:hover, .open:focus-visible { color: var(--ob-brand); text-decoration: underline; }
+
+.meter { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--ob-surface); border: 1px solid var(--ob-border); min-width: 6rem; flex: 1; }
+.meter .done { background: var(--ob-done); }
+.meter .doing { background: var(--ob-doing); }
+.count { font-family: var(--ob-font-mono); font-size: 0.75rem; white-space: nowrap; }
+.doing-n { color: var(--ob-muted); }
+.empty { color: var(--ob-muted); font-size: 0.8125rem; margin: 0.25rem 0; }
+
+/* A narrow box (epic 0 beside the plan, or a phone): the bar and its numbers go under the title. */
+@container (max-width: 36rem) {
+  .row { grid-template-columns: 2.75rem minmax(0, 1fr); row-gap: 0.25rem; }
+  .row .meter { grid-column: 2; }
+  .row .count { grid-column: 2; white-space: normal; }
+}

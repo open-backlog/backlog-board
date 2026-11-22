@@ -105,12 +105,12 @@ export async function startBoard(opts: BoardOptions = {}): Promise<Board> {
         if (!allowedOrigin(req.headers.origin, port)) return sendJson(403, { error: 'changes are accepted only from the board itself' });
         if (!/^application\/json\b/.test(req.headers['content-type'] ?? '')) return sendJson(415, { error: 'send JSON (Content-Type: application/json)' });
       }
-      if (path === '/api/health' && reading) {
+      if (path === '/api/v1/health' && reading) {
         const b = loadBacklog(backlogDir);
         const health: Health = { board: ownVersion, core: coreVersion, spec: SPEC_VERSION, backlog: { name: String(b.config['name'] ?? ''), items: b.items.length } };
         return sendJson(200, health);
       }
-      if (path === '/api/events' && method === 'GET') return events.open(res);
+      if (path === '/api/v1/events' && method === 'GET') return events.open(res);
       if (await route(api, req, path, raw, sendJson)) return;
       return sendJson(404, { error: `no API ${path}` });
     }

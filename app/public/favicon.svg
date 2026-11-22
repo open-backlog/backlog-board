@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><title>Open Backlog</title><style>svg{color:#b45309}@media (prefers-color-scheme:dark){svg{color:#f0a33a}}</style><defs>
+    <mask id="ob-mark-small-back" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64">
+      <rect width="64" height="64" fill="#fff"/>
+      <rect x="13" y="13" width="38" height="38" rx="9" fill="#000"/>
+    </mask>
+    <mask id="ob-mark-small-mid" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64">
+      <rect width="64" height="64" fill="#fff"/>
+      <rect x="24" y="24" width="38" height="38" rx="9" fill="#000"/>
+    </mask>
+  </defs>
+  <rect x="8" y="8" width="26" height="26" rx="4" fill="none" stroke="currentColor" stroke-width="6" mask="url(#ob-mark-small-back)"/>
+  <rect x="19" y="19" width="26" height="26" rx="4" fill="none" stroke="currentColor" stroke-width="6" mask="url(#ob-mark-small-mid)"/>
+  <rect x="28" y="28" width="30" height="30" rx="6" fill="currentColor"/></svg>

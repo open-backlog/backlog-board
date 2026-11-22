@@ -1,0 +1,19 @@
+/* Global styles. Colors and type come from backlog-art's tokens (app/src/art/tokens/tokens.css,
+   copied by script/sync-art.sh); light or dark follows the system setting. Bootstrap's own
+   variables are pointed at the tokens so its components match, as in backlog-ui. */
+:root {
+  --bs-body-font-family: var(--ob-font-sans);
+  --bs-font-monospace: var(--ob-font-mono);
+  --bs-body-color: var(--ob-ink);
+  --bs-body-bg: var(--ob-surface);
+  --bs-emphasis-color: var(--ob-ink);
+  --bs-secondary-color: var(--ob-muted);
+  --bs-secondary-bg: var(--ob-subtle);
+  --bs-tertiary-bg: var(--ob-subtle);
+  --bs-border-color: var(--ob-border);
+  --bs-link-color: var(--ob-brand);
+  --bs-link-hover-color: var(--ob-brand);
+  --bs-heading-color: var(--ob-ink);
+}
+body { background: var(--ob-surface); color: var(--ob-ink); font-family: var(--ob-font-sans); }
+code, kbd, pre, samp { font-family: var(--ob-font-mono); }

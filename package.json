@@ -1,0 +1,64 @@
+{
+  "name": "open-backlog-board",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Open Backlog's local board: a web board over a backlog of Markdown files in git, on this computer only. Started by ob serve.",
+  "license": "MIT",
+  "author": "Brandon Castagna",
+  "homepage": "https://openbacklog.org",
+  "keywords": ["backlog", "board", "kanban", "markdown", "git"],
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "open-backlog-board": "dist/server/main.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/server/board.d.ts",
+      "import": "./dist/server/board.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "dev": "node script/dev.mjs",
+    "build": "npm run build:server && npm run build:app",
+    "build:server": "rm -rf dist/server && tsc -p tsconfig.server.json && chmod +x dist/server/main.js",
+    "build:app": "ng build",
+    "lint": "eslint . && tsc --noEmit && tsc -p app/tsconfig.app.json --noEmit",
+    "test": "vitest run && ng test",
+    "smoke": "node script/smoke.mjs",
+    "check": "npm run lint && npm run build && npm test && npm run smoke",
+    "sync-art": "./script/sync-art.sh",
+    "sync-fixtures": "./script/sync-fixtures.sh"
+  },
+  "dependencies": {
+    "open-backlog": "^0.2.0"
+  },
+  "devDependencies": {
+    "@angular/build": "^22.2.7",
+    "@angular/cli": "^22.2.7",
+    "@angular/common": "^22.2.6",
+    "@angular/compiler": "^22.2.6",
+    "@angular/compiler-cli": "^22.2.6",
+    "@angular/core": "^22.2.6",
+    "@angular/platform-browser": "^22.2.6",
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.20.5",
+    "bootstrap": "^5.3.9",
+    "eslint": "^10.15.0",
+    "jsdom": "^30.1.3",
+    "rxjs": "~7.8.0",
+    "tslib": "^2.3.0",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.73.0",
+    "vitest": "^5.1.0"
+  }
+}

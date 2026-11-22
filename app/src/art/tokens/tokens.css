@@ -1,0 +1,52 @@
+/* Open Backlog design tokens — generated from tokens/tokens.json by script/export.sh. Do not edit by hand. */
+
+@font-face { font-family: 'IBM Plex Sans'; src: url('../fonts/IBMPlexSans-Variable.ttf') format('truetype'); font-weight: 100 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'IBM Plex Sans'; src: url('../fonts/IBMPlexSans-Italic-Variable.ttf') format('truetype'); font-weight: 100 700; font-style: italic; font-display: swap; }
+@font-face { font-family: 'IBM Plex Mono'; src: url('../fonts/IBMPlexMono-Regular.ttf') format('truetype'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'IBM Plex Mono'; src: url('../fonts/IBMPlexMono-Bold.ttf') format('truetype'); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'IBM Plex Mono'; src: url('../fonts/IBMPlexMono-Italic.ttf') format('truetype'); font-weight: 400; font-style: italic; font-display: swap; }
+
+:root {
+  --ob-font-sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --ob-font-mono: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+  --ob-weight-regular: 400;
+  --ob-weight-bold: 700;
+  --ob-surface: #ffffff;
+  --ob-subtle: #f6f8fa;
+  --ob-border: #d0d7de;
+  --ob-ink: #1f2328;
+  --ob-muted: #59636e;
+  --ob-brand: #b45309;
+  --ob-todo: #59636e;
+  --ob-doing: #0a3069;
+  --ob-done: #1a7f37;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ob-surface: #0d1117;
+    --ob-subtle: #161b22;
+    --ob-border: #30363d;
+    --ob-ink: #e6edf3;
+    --ob-muted: #9198a1;
+    --ob-brand: #f0a33a;
+    --ob-todo: #9198a1;
+    --ob-doing: #2f81f7;
+    --ob-done: #3fb950;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ob-surface: #0d1117;
+  --ob-subtle: #161b22;
+  --ob-border: #30363d;
+  --ob-ink: #e6edf3;
+  --ob-muted: #9198a1;
+  --ob-brand: #f0a33a;
+  --ob-todo: #9198a1;
+  --ob-doing: #2f81f7;
+  --ob-done: #3fb950;
+  color-scheme: dark;
+}

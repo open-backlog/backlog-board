@@ -1,0 +1,96 @@
+{
+  "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
+  "version": 1,
+  "cli": {
+    "packageManager": "npm",
+    "analytics": false
+  },
+  "newProjectRoot": "app",
+  "projects": {
+    "board": {
+      "projectType": "application",
+      "root": "app",
+      "sourceRoot": "app/src",
+      "prefix": "ob",
+      "architect": {
+        "build": {
+          "builder": "@angular/build:application",
+          "options": {
+            "browser": "app/src/main.ts",
+            "tsConfig": "app/tsconfig.app.json",
+            "assets": [
+              {
+                "glob": "**/*",
+                "input": "app/public"
+              }
+            ],
+            "styles": [
+              "node_modules/bootstrap/dist/css/bootstrap.min.css",
+              "app/src/art/tokens/tokens.css",
+              "app/src/styles.css"
+            ],
+            "outputPath": {
+              "base": "dist/app",
+              "browser": ""
+            }
+          },
+          "configurations": {
+            "production": {
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "500kB",
+                  "maximumError": "1MB"
+                },
+                {
+                  "type": "anyComponentStyle",
+                  "maximumWarning": "4kB",
+                  "maximumError": "8kB"
+                }
+              ],
+              "outputHashing": "all",
+              "optimization": {
+                "scripts": true,
+                "styles": {
+                  "minify": true,
+                  "inlineCritical": false
+                },
+                "fonts": false
+              }
+            },
+            "development": {
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": true
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "serve": {
+          "builder": "@angular/build:dev-server",
+          "options": {
+            "proxyConfig": "app/proxy.conf.json",
+            "host": "127.0.0.1",
+            "port": 4300
+          },
+          "configurations": {
+            "production": {
+              "buildTarget": "board:build:production"
+            },
+            "development": {
+              "buildTarget": "board:build:development"
+            }
+          },
+          "defaultConfiguration": "development"
+        },
+        "test": {
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "tsConfig": "app/tsconfig.spec.json",
+            "buildTarget": "board:build:development"
+          }
+        }
+      }
+    }
+  }
+}

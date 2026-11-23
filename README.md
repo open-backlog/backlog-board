@@ -6,7 +6,7 @@ those files as columns of cards you drag, a tree of the whole plan with its prog
 button that shares your changes through your own git. It runs on your computer only, and every
 change is a git commit you can read.
 
-![The board: todo, doing and done columns of cards, with filters](https://cdn.jsdelivr.net/npm/open-backlog-board@0.3.0/screenshots/board.png)
+![The board: todo, doing and done columns of cards, with filters](https://cdn.jsdelivr.net/npm/open-backlog-board@0.3.1/screenshots/board.png)
 
 ## Start it
 
@@ -61,7 +61,7 @@ open-backlog-board [<folder>] [--port <n>] [--open]   # default: here, port 4310
 
 ## An item
 
-![An item open beside the board: where it sits, its fields, description and comments](https://cdn.jsdelivr.net/npm/open-backlog-board@0.3.0/screenshots/item.png)
+![An item open beside the board: where it sits, its fields, description and comments](https://cdn.jsdelivr.net/npm/open-backlog-board@0.3.1/screenshots/item.png)
 
 Click a card's title to open it beside the board:
 
@@ -87,7 +87,7 @@ into this month's unplanned work), and it opens when it's made.
 
 ## The tree
 
-![The tree: capabilities, epics and features, each with a progress bar](https://cdn.jsdelivr.net/npm/open-backlog-board@0.3.0/screenshots/tree.png)
+![The tree: capabilities, epics and features, each with a progress bar](https://cdn.jsdelivr.net/npm/open-backlog-board@0.3.1/screenshots/tree.png)
 
 **Tree** (at the top, or `/#tree`) shows the plan: capabilities, epics and features, nested, each
 with a progress bar from its stories, bugs, spikes and tasks: done in green, doing beside it, and
@@ -97,7 +97,7 @@ it with theirs. Click a feature or an epic to open the board filtered to it.
 
 ## Sync
 
-![Sync, with the two commits it will send](https://cdn.jsdelivr.net/npm/open-backlog-board@0.3.0/screenshots/sync.png)
+![Sync, with the two commits it will send](https://cdn.jsdelivr.net/npm/open-backlog-board@0.3.1/screenshots/sync.png)
 
 Every change on the board is a commit in your repository, and none of it leaves your computer
 until you click **Sync** (top right). Beside it, "3 to share" counts your commits that aren't on

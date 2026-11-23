@@ -1,6 +1,6 @@
 {
   "name": "open-backlog-board",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Open Backlog's local board: drag cards, edit items, see the plan's progress and Sync, over a backlog of Markdown files in git, on your computer only.",
   "license": "MIT",
   "author": "Brandon Castagna",

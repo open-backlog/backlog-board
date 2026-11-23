@@ -117,10 +117,11 @@ describe('the board server', () => {
     expect(Object.keys(pkg.dependencies)).toEqual(['open-backlog']);
   });
 
-  it('depends on the open-backlog minor version it is tested with (2.4.7): any 0.2.x, never 0.3', () => {
-    const pkg = JSON.parse(readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8')) as { dependencies: Record<string, string> };
+  it('depends on the open-backlog minor version it is tested with (2.4.7), which is its own (2.4.8: ob serve runs it)', () => {
+    const pkg = JSON.parse(readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8')) as { version: string; dependencies: Record<string, string> };
     const core = JSON.parse(readFileSync(fileURLToPath(new URL('../node_modules/open-backlog/package.json', import.meta.url)), 'utf8')) as { version: string };
-    const [major, minor] = core.version.split('.');
-    expect(pkg.dependencies['open-backlog']).toBe(`^${major}.${minor}.0`);
+    const line = (v: string) => v.split('.').slice(0, 2).join('.');
+    expect(pkg.dependencies['open-backlog']).toBe(`^${line(core.version)}.0`);
+    expect(line(pkg.version)).toBe(line(core.version));
   });
 });

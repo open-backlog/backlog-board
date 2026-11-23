@@ -3,7 +3,7 @@
 // starts the installed open-backlog-board on a fixture backlog, and fetches the app, a bundle and
 // /api/v1/health from it on 127.0.0.1.
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -31,7 +31,11 @@ try {
   const bin = join(tmp, 'bin', 'open-backlog-board');
   const fixture = join(root, 'test', 'fixtures', 't3-application', 'backlog', 'stories');
 
-  board = spawn(bin, ['--dir', fixture, '--port', '0'], { stdio: ['ignore', 'pipe', 'pipe'] });
+  // --open, with $BROWSER standing in for the browser: it is given the board's address.
+  const opener = join(tmp, 'browser.sh');
+  writeFileSync(opener, `#!/bin/sh\necho "$1" > ${JSON.stringify(join(tmp, 'opened'))}\n`);
+  chmodSync(opener, 0o755);
+  board = spawn(bin, ['--dir', fixture, '--port', '0', '--open'], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, BROWSER: opener } });
   let out = '', err = '';
   board.stderr.on('data', d => { err += d; });
   const url = await new Promise((ok, no) => {
@@ -40,6 +44,10 @@ try {
     board.on('exit', code => no(new Error(`exited ${code}: ${err}`)));
   });
   console.log(`smoke: the installed open-backlog-board listens on ${url}`);
+  for (let i = 0; i < 50 && !existsSync(join(tmp, 'opened')); i++) await new Promise(ok => setTimeout(ok, 100));
+  const opened = existsSync(join(tmp, 'opened')) ? readFileSync(join(tmp, 'opened'), 'utf8').trim() : '';
+  if (opened !== url) fail(`--open gave the browser "${opened}", expected ${url}`);
+  else console.log('smoke: --open hands the address to the browser ($BROWSER)');
 
   const page = await (await fetch(url)).text();
   const script = /src="(main-[^"]+\.js)"/.exec(page)?.[1];

@@ -11,6 +11,8 @@ export default tseslint.config(
     // The board's rules are open-backlog's (D1): the server reads, checks, writes and commits
     // through it, never with its own YAML or schema code, or by running git itself (D2).
     files: ['server/**/*.ts'],
+    // open.ts runs the browser (--open), not git.
+    ignores: ['server/open.ts'],
     rules: {
       'no-restricted-imports': ['error', { paths: [
         { name: 'yaml', message: 'read and write items through open-backlog' },

@@ -6,7 +6,7 @@ those files as columns of cards you drag, a tree of the whole plan with its prog
 button that shares your changes through your own git. It runs on your computer only, and every
 change is a git commit you can read.
 
-![The board: todo, doing and done columns of cards, with filters](https://cdn.jsdelivr.net/npm/open-backlog-board@0.1.0/screenshots/board.png)
+![The board: todo, doing and done columns of cards, with filters](https://cdn.jsdelivr.net/npm/open-backlog-board@0.3.0/screenshots/board.png)
 
 ## Start it
 
@@ -31,15 +31,17 @@ npm install --global open-backlog-board
 open-backlog-board ~/path/to/repo
 ```
 
-No backlog yet? `npx open-backlog init` makes one (see
-[open-backlog](https://www.npmjs.com/package/open-backlog), the `ob` command). Soon `ob serve`
-will start the board and open your browser in one step.
+With the `ob` command ([open-backlog](https://www.npmjs.com/package/open-backlog)) installed,
+`ob serve` does all of this in one step: it starts this board for the backlog you're in and opens
+your browser, fetching the board from npm the first time. No backlog yet? `ob init` (or
+`npx open-backlog init`) makes one.
 
 Every drag and every save is a real commit in that repository, made with your git name, so try it
 on a copy first if you like. Nothing leaves your computer until you click **Sync**.
 
 ```sh
-open-backlog-board [<folder>] [--port <n>]   # default: here, port 4310 (or the next free one)
+open-backlog-board [<folder>] [--port <n>] [--open]   # default: here, port 4310 (or the next free one)
+                                                    # --open: open it in your browser ($BROWSER, if set)
 ```
 
 ## The board
@@ -59,7 +61,7 @@ open-backlog-board [<folder>] [--port <n>]   # default: here, port 4310 (or the 
 
 ## An item
 
-![An item open beside the board: where it sits, its fields, description and comments](https://cdn.jsdelivr.net/npm/open-backlog-board@0.1.0/screenshots/item.png)
+![An item open beside the board: where it sits, its fields, description and comments](https://cdn.jsdelivr.net/npm/open-backlog-board@0.3.0/screenshots/item.png)
 
 Click a card's title to open it beside the board:
 
@@ -85,7 +87,7 @@ into this month's unplanned work), and it opens when it's made.
 
 ## The tree
 
-![The tree: capabilities, epics and features, each with a progress bar](https://cdn.jsdelivr.net/npm/open-backlog-board@0.1.0/screenshots/tree.png)
+![The tree: capabilities, epics and features, each with a progress bar](https://cdn.jsdelivr.net/npm/open-backlog-board@0.3.0/screenshots/tree.png)
 
 **Tree** (at the top, or `/#tree`) shows the plan: capabilities, epics and features, nested, each
 with a progress bar from its stories, bugs, spikes and tasks: done in green, doing beside it, and
@@ -95,7 +97,7 @@ it with theirs. Click a feature or an epic to open the board filtered to it.
 
 ## Sync
 
-![Sync, with the two commits it will send](https://cdn.jsdelivr.net/npm/open-backlog-board@0.1.0/screenshots/sync.png)
+![Sync, with the two commits it will send](https://cdn.jsdelivr.net/npm/open-backlog-board@0.3.0/screenshots/sync.png)
 
 Every change on the board is a commit in your repository, and none of it leaves your computer
 until you click **Sync** (top right). Beside it, "3 to share" counts your commits that aren't on
@@ -128,9 +130,10 @@ read again; **Check again** looks once you're done.
 - Every rule comes from [`open-backlog`](https://www.npmjs.com/package/open-backlog), the same
   core as the `ob` command: reading the files, IDs, validation and git. It's the board's only
   run-time dependency, and lint stops the server from importing a YAML or schema library or
-  running git itself, so the board and the CLI can't disagree. The board depends on the same
-  minor version of `open-backlog` it was tested with (`^0.2.0`: any 0.2.x, never 0.3), since
-  while Open Backlog is 0.x a minor version is where its rules can change.
+  running git itself, so the board and the CLI can't disagree. The board's version goes with
+  `open-backlog`'s: board 0.3.x depends on `^0.3.0` (any 0.3.x, never 0.4), since while Open
+  Backlog is 0.x a minor version is where its rules can change, and `ob` 0.3.x's `ob serve`
+  runs board 0.3.x.
 
 ## The API
 
@@ -196,7 +199,9 @@ another backlog: `npm run dev ../my-repo`.
 ### Releasing
 
 Change `"version"` in `package.json` (and the version in the README's image links: `npm run
-check` fails until they match), commit and push to `main`. The Publish workflow publishes that
+check` fails until they match), commit and push to `main`. Keep its major and minor version
+the same as the `open-backlog` it depends on (a test checks): a new `open-backlog` minor
+version is published first, then the board's. The Publish workflow publishes that
 version to npm when it isn't there yet, after the full check, and tags the commit `v<version>`.
 A push that doesn't change the version publishes nothing.
 

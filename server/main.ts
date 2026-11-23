@@ -1,16 +1,17 @@
 #!/usr/bin/env node
-// open-backlog-board [<folder>] [--port <n>]: the board for the backlog found from <folder> (or
-// here), on 127.0.0.1; --dir <folder> also works. ob serve (2.4.8) starts it and opens the browser.
+// open-backlog-board [<folder>] [--port <n>] [--open]: the board for the backlog found from
+// <folder> (or here), on 127.0.0.1; --dir <folder> also works. ob serve (2.4.8) runs it with --open.
 import { parseArgs } from 'node:util';
 
 import { DEFAULT_PORT, startBoard } from './board.js';
+import { openBrowser } from './open.js';
 
 try {
-  const { values, positionals } = parseArgs({ allowPositionals: true, options: { dir: { type: 'string' }, port: { type: 'string' }, help: { type: 'boolean', short: 'h' } } });
+  const { values, positionals } = parseArgs({ allowPositionals: true, options: { dir: { type: 'string' }, port: { type: 'string' }, open: { type: 'boolean' }, help: { type: 'boolean', short: 'h' } } });
   if (positionals.length > 1 || (positionals.length && values.dir)) throw new Error('give one folder');
   const dir = positionals[0] ?? values.dir;
   if (values.help) {
-    process.stdout.write(`Usage: open-backlog-board [<folder>] [--port <n>]\n\nThe board for the backlog in <folder> or a parent (default: here), at http://127.0.0.1:${DEFAULT_PORT}/.\nIt listens on this computer only. Stop it with Ctrl-C.\n`);
+    process.stdout.write(`Usage: open-backlog-board [<folder>] [--port <n>] [--open]\n\nThe board for the backlog in <folder> or a parent (default: here), at http://127.0.0.1:${DEFAULT_PORT}/\n(or the next free port). It listens on this computer only. Stop it with Ctrl-C.\n\n  --port <n>  listen on this port\n  --open      open it in your browser ($BROWSER, if set)\n`);
   } else {
     const port = values.port === undefined ? DEFAULT_PORT : Number(values.port);
     if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error(`--port ${values.port} is not a port number`);
@@ -25,6 +26,7 @@ try {
       }
     }
     process.stdout.write(`Open Backlog board for ${board.backlogDir}\n${board.url}\n`);
+    if (values.open) openBrowser(board.url, t => process.stderr.write(t));
     const stop = () => { void board.close().then(() => process.exit(0)); };
     process.on('SIGINT', stop);
     process.on('SIGTERM', stop);

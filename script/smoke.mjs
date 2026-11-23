@@ -17,10 +17,10 @@ let board;
 try {
   const [packed] = JSON.parse(execFileSync('npm', ['pack', '--dry-run', '--json', '--silent'], { cwd: root, encoding: 'utf8' }));
   const files = packed.files.map(f => f.path);
-  const extra = files.filter(f => !/^(package\.json|README\.md|LICENSE|dist\/server\/[a-z]+\.(js|d\.ts)|dist\/app\/.+|screenshots\/[a-z-]+\.png)$/.test(f));
-  const missing = ['dist/server/main.js', 'dist/server/board.js', 'dist/app/index.html', 'dist/app/board-icon.png', 'LICENSE', 'README.md'].filter(f => !files.includes(f));
+  const extra = files.filter(f => !/^(package\.json|README\.md|LICENSE|dist\/server\/[a-z]+\.(js|d\.ts)|dist\/app\/.+|screenshots\/[a-z-]+\.png|app\/src\/art\/fonts\/OFL\.txt)$/.test(f));
+  const missing = ['dist/server/main.js', 'dist/server/board.js', 'dist/app/index.html', 'dist/app/board-icon.png', 'app/src/art/fonts/OFL.txt', 'LICENSE', 'README.md'].filter(f => !files.includes(f));
   if (extra.length || missing.length) fail(`the package has ${extra.join(', ') || 'nothing extra'} and lacks ${missing.join(', ') || 'nothing'}`);
-  else console.log(`smoke: the package is ${files.length} files (${(packed.size / 1024).toFixed(0)} kB): the built server and app, the README's screenshots, README, LICENSE, package.json`);
+  else console.log(`smoke: the package is ${files.length} files (${(packed.size / 1024).toFixed(0)} kB): the built server and app, the README's screenshots, the fonts' license, README, LICENSE, package.json`);
   const images = readmeImages(root, pkg.version);
   const shipped = [...readFileSync(join(root, 'README.md'), 'utf8').matchAll(/screenshots\/[a-z-]+\.png/g)].map(m => m[0]).filter(f => !files.includes(f));
   if (images.length || shipped.length) fail(`README images: ${[...images, ...shipped.map(f => `${f} is not in the package`)].join('; ')}`);

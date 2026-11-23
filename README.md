@@ -125,7 +125,7 @@ read again; **Check again** looks once you're done.
 - `server/`: a small HTTP server on **127.0.0.1 only**, so nothing else on the network can reach
   it. It answers only requests addressed to `127.0.0.1` or `localhost` on its port, which stops a
   web page from pointing its own name at it. It serves the built app and a JSON API.
-- `app/`: the Angular app, built into the package (`dist/app`), with backlog-art's colors, type
+- `app/`: the Angular app, built into the package (`dist/app`), with Open Backlog's colors, type
   and icons; light or dark follows your system.
 - Every rule comes from [`open-backlog`](https://www.npmjs.com/package/open-backlog), the same
   core as the `ob` command: reading the files, IDs, validation and git. It's the board's only
@@ -191,7 +191,7 @@ another backlog: `npm run dev ../my-repo`.
 | `app/` | the Angular app (`app/src`): the shell (`app.ts`), the board (`board.ts`), the item panel and new-item form, the events, its config and the dev proxy |
 | `test/` | the server's tests (Vitest); the app's tests are `app/src/**/*.spec.ts` (`ng test`) |
 | `test/fixtures/` | two of backlog-spec's example backlogs, copied by `script/sync-fixtures.sh` |
-| `script/sync-art.sh` | copies backlog-art's tokens, fonts and icons into the app |
+| `script/sync-art.sh` | copies the brand's tokens, fonts and icons into the app from backlog-art, the project's private art repository; the copies here are what the build uses |
 | `script/smoke.mjs` | packs the package, checks its files, installs it globally into a temporary folder, starts it and fetches the app and the API |
 | `script/prepublish.mjs` | before any `npm publish`: refuses uncommitted changes and README images for another version |
 | `screenshots/` | the README's images, shipped in the package so the npm page can show them |
@@ -202,9 +202,21 @@ Change `"version"` in `package.json` (and the version in the README's image link
 check` fails until they match), commit and push to `main`. Keep its major and minor version
 the same as the `open-backlog` it depends on (a test checks): a new `open-backlog` minor
 version is published first, then the board's. The Publish workflow publishes that
-version to npm when it isn't there yet, after the full check, and tags the commit `v<version>`.
-A push that doesn't change the version publishes nothing.
+version to npm when it isn't there yet, after the full check, through npm trusted publishing
+with provenance, and tags the commit `v<version>`. A push that doesn't change the version
+publishes nothing.
+
+## Contributing
+
+Report a bug or suggest an idea as a [GitHub issue](https://github.com/open-backlog/backlog-board/issues/new/choose),
+then send a pull request: [CONTRIBUTING.md](https://github.com/open-backlog/backlog-board/blob/main/CONTRIBUTING.md).
+A change to the rules belongs in the [specification](https://github.com/open-backlog/backlog-spec).
+Everyone taking part follows the
+[code of conduct](https://github.com/open-backlog/backlog-board/blob/main/CODE_OF_CONDUCT.md).
 
 ## License
 
-MIT. The specification is CC BY 4.0.
+The code is [MIT](https://github.com/open-backlog/backlog-board/blob/main/LICENSE). The fonts are
+IBM Plex, under the SIL Open Font License (`app/src/art/fonts/OFL.txt`, also in the package). The
+Open Backlog name and logo are not covered by the MIT license: you may use them to refer to the
+project, but not to brand your own product or a fork. The specification is CC BY 4.0.

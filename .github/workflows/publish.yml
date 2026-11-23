@@ -4,10 +4,10 @@ name: Publish
 # open-backlog-board (its prepublishOnly runs script/prepublish.mjs and the full check first), then
 # a tag v<version> on that commit. A push that doesn't change the version publishes nothing. So a
 # release is: change "version" (and the README's image links), commit, push.
-# The very first version is published by hand (npm allows trusted publishing only for a package
-# that exists); this workflow then tags it on the next push. npm signs provenance only for
-# packages built in a public repository, so --provenance comes when backlog-board goes public
-# (3.2.3).
+# It publishes through npm trusted publishing (no token anywhere) from open-backlog/backlog-board,
+# with provenance: the npm page shows which commit and workflow built each version. The very
+# first version was published by hand (npm allows trusted publishing only for a package that
+# exists).
 on:
   push:
     branches: [main]
@@ -48,7 +48,7 @@ jobs:
         run: npm ci
       - if: steps.version.outputs.new == 'true'
         # prepublishOnly: script/prepublish.mjs, then npm run check (lint, build, test, smoke).
-        run: npm publish --access public
+        run: npm publish --access public --provenance
       - name: Tag the release
         # Also for a version published by hand (the first one): tag it if it isn't tagged yet.
         run: |

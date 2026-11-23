@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Propose a change to the rules
+    url: https://github.com/open-backlog/backlog-spec/issues/new/choose
+    about: The format itself (folders, fields, IDs) is the specification's, not the board's.

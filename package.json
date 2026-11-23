@@ -5,6 +5,13 @@
   "license": "MIT",
   "author": "Brandon Castagna",
   "homepage": "https://openbacklog.org",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/open-backlog/backlog-board.git"
+  },
+  "bugs": {
+    "url": "https://github.com/open-backlog/backlog-board/issues"
+  },
   "keywords": [
     "backlog",
     "board",
@@ -29,6 +36,7 @@
   "files": [
     "dist",
     "screenshots",
+    "app/src/art/fonts/OFL.txt",
     "LICENSE",
     "README.md"
   ],

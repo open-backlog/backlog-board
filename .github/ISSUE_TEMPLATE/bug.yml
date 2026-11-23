@@ -1,0 +1,24 @@
+name: Bug
+description: Something the board does wrong.
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what the board did, and what you expected instead.
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: The board shows them in its header (open-backlog), and node --version and git --version give the rest.
+      placeholder: open-backlog-board 0.3.1, open-backlog 0.3.2, Node 24, git 2.54, macOS
+    validations:
+      required: true
+  - type: textarea
+    id: backlog
+    attributes:
+      label: The backlog
+      description: The smallest backlog that shows it, or the files involved. Leave out anything private.
